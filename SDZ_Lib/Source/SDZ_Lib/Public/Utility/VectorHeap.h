@@ -32,13 +32,13 @@ public:
 		m_data.push_back(item);
 		std::push_heap(m_data.begin(), m_data.end(), m_Comaprison);
 	}
+
 	void Pop()
 	{
 		const size_t curr = m_data.size();
 		std::pop_heap(m_data.begin(), m_data.end(), m_Comaprison);
 		m_data.pop_back();
 	}
-
 
 	void Push_Unsorted(const T& item)
 	{
