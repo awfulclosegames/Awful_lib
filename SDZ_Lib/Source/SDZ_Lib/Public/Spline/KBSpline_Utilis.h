@@ -8,8 +8,9 @@
 class KBSplineUtils
 {
 public:
-	bool Prepare(UKBSplineConfig& Config, FKBSplineState& State);
+	bool Prepare(const UKBSplineConfig& Config, FKBSplineState& State);
 
+	void GenerateCoeffisients(const FKBSplinePoint* Points, float a, float b, float c, float d, TArray<FVector>& Coeffs);
 
 private:
 
