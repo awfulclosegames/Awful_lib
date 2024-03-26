@@ -1,0 +1,80 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
+
+#include "SDZ_KBSpline_DataTypes.generated.h"
+
+
+USTRUCT(BlueprintType)
+struct FKBSplinePoint
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector Location = { 0.0f, 0.0f, 0.0f };
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Tau = 0.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Beta = 0.5f;
+};
+
+USTRUCT(BlueprintType)
+struct FKBSplineBounds
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float BoundMin = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float BoundMax = 0.0f;
+};
+
+// should this be a class instead of struct so I don't need to copy 36 bytes all the time?
+USTRUCT(BlueprintType)
+struct FKBSplineState
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int CurrentTraversalSegment = -1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, EditFixedSize)
+	TArray<FVector> PrecomputedCoefficients;
+
+	//UPROPERTY(EditAnywhere, BlueprintReadOnly, EditFixedSize)
+	//TArray<float> Tau;
+
+	//UPROPERTY(EditAnywhere, BlueprintReadOnly, EditFixedSize)
+	//TArray<float> Beta;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Time = 0.0f;
+
+	FKBSplineState();
+};
+
+
+UCLASS(BlueprintType)
+class UKBSplineConfig : public UObject
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FKBSplinePoint> ControlPoints;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TArray<FKBSplineBounds> ControlPointBounds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FKBSplinePoint OriginPoint;
+
+	UKBSplineConfig() : Super() {}
+
+	UKBSplineConfig(FVector Location);
+
+	bool IsValidSegment(int ID) { return ID > 0 && ID < ControlPoints.Num(); }
+
+};
+

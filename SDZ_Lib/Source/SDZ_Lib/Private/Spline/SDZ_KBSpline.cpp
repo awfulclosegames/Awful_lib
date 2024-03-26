@@ -2,34 +2,24 @@
 
 
 #include "Spline/SDZ_KBSpline.h"
+#include "Spline/KBSpline_Utilis.h"
 
-UKBSplineConfig::UKBSplineConfig(FVector Location)
-	: Super()
+UKBSplineConfig* USDZ_KBSpline::CreateSplineConfig(FVector Location)
 {
-	OriginPoint.Location = Location;
+	if (UKBSplineConfig* newItem = NewObject<UKBSplineConfig>())
+	{
+		// anchor it on the given location and set that as the *base* point for all splines
+		newItem->OriginPoint.Location = Location;
+		newItem->ControlPoints.Add(newItem->OriginPoint);
+		return newItem;
+	}
+	return nullptr;
 }
 
 void USDZ_KBSpline::AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point)
 {
 	if (IsValid(Config))
 		Config->ControlPoints.Add(Point);
-}
-
-FKBSplineState::FKBSplineState()
-	: PrecomputedCoefficients({ 0.0f,0.0f,0.0f,0.0f })
-	//, Tau({ 0.0f,0.0f})
-	//, Beta({ 0.0f,0.0f })
-{
-}
-
-UKBSplineConfig* USDZ_KBSpline::CreateSplineConfig(FVector Location)
-{
-	if (UKBSplineConfig* newItem = NewObject<UKBSplineConfig>())
-	{
-		newItem->OriginPoint.Location = Location;
-		return newItem;
-	}
-	return nullptr;
 }
 
 FKBSplineState USDZ_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int PointID)
@@ -44,13 +34,15 @@ FKBSplineState USDZ_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int 
 	return FKBSplineState{};
 }
 
-FVector USDZ_KBSpline::Sample(UKBSplineConfig* Config, FKBSplineState State)
+FVector USDZ_KBSpline::Sample(FKBSplineState State)
 {
 	// compute the linear combination of 
-	// State.PrecomputedCoefficients[0] * t^3 + 
-	//    State.PrecomputedCoefficients[1] * t^2 + 
-	//    State.PrecomputedCoefficients[2] * t + 
-	//    State.PrecomputedCoefficients[3]  
 
-	return FVector(0.0f);
+	float TimeSquared = State.Time * State.Time;
+	float TimeQubed = TimeSquared * State.Time;
+	FVector SamplePoint = State.PrecomputedCoefficients[0] * TimeQubed +
+		State.PrecomputedCoefficients[1] * TimeSquared +
+		State.PrecomputedCoefficients[2] * State.Time +
+		State.PrecomputedCoefficients[3];
+	return SamplePoint;
 }
