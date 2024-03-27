@@ -15,6 +15,7 @@ UCLASS()
 class SDZ_LIB_API USDZ_KBSpline : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
+public:
 
 	UFUNCTION(BlueprintCallable)
 	static void AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point);
@@ -28,5 +29,9 @@ class SDZ_LIB_API USDZ_KBSpline : public UBlueprintFunctionLibrary
 	UFUNCTION(BlueprintCallable)
 	static FVector Sample( FKBSplineState State);
 
+	UFUNCTION(BlueprintCallable)
+	static void DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State);
+
+private:
 
 };

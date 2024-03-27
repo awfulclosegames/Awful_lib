@@ -16,7 +16,7 @@ struct FKBSplinePoint
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector Location = { 0.0f, 0.0f, 0.0f };
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Tau = 0.5f;
+	float Tau = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Beta = 0.5f;
 };
@@ -43,12 +43,6 @@ struct FKBSplineState
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, EditFixedSize)
 	TArray<FVector> PrecomputedCoefficients;
 
-	//UPROPERTY(EditAnywhere, BlueprintReadOnly, EditFixedSize)
-	//TArray<float> Tau;
-
-	//UPROPERTY(EditAnywhere, BlueprintReadOnly, EditFixedSize)
-	//TArray<float> Beta;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Time = 0.0f;
 
@@ -74,7 +68,7 @@ public:
 
 	UKBSplineConfig(FVector Location);
 
-	bool IsValidSegment(int ID) { return ID > 0 && ID < ControlPoints.Num(); }
+	bool IsValidSegment(int ID) const { return ID > 0 && ID < ControlPoints.Num(); }
 
 };
 
