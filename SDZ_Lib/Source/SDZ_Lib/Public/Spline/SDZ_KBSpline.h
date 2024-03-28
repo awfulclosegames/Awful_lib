@@ -27,7 +27,10 @@ public:
 	static FKBSplineState PrepareForEvaluation(UKBSplineConfig* Config, int PointID = 1);
 
 	UFUNCTION(BlueprintCallable)
-	static FVector Sample( FKBSplineState State);
+	static FVector Sample(FKBSplineState State);
+
+	UFUNCTION(BlueprintCallable)
+	static FVector SampleExplicit(FKBSplineState State, float Completion);
 
 	UFUNCTION(BlueprintCallable)
 	static void DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State);

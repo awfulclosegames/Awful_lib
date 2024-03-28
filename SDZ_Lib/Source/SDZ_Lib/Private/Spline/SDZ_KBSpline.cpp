@@ -52,6 +52,19 @@ FVector USDZ_KBSpline::Sample(FKBSplineState State)
 	return SamplePoint;
 }
 
+FVector USDZ_KBSpline::SampleExplicit(FKBSplineState State, float Completion)
+{
+	// compute the linear combination of 
+
+	float TimeSquared = Completion * Completion;
+	float TimeQubed = TimeSquared * Completion;
+	FVector SamplePoint = State.PrecomputedCoefficients[0] * TimeQubed +
+		State.PrecomputedCoefficients[1] * TimeSquared +
+		State.PrecomputedCoefficients[2] * Completion +
+		State.PrecomputedCoefficients[3];
+	return SamplePoint;
+}
+
 void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State)
 {
 #if !UE_BUILD_SHIPPING
@@ -59,6 +72,8 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 		return;
 	if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
 	{
+		const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
+		const FVector TraversalEnd = Config->ControlPoints[State.CurrentTraversalSegment + 1].Location;
 		int CPIdx = State.CurrentTraversalSegment - 1;
 		FVector prevPoint = Config->ControlPoints[CPIdx].Location;
 		for (int pointNum = 0; pointNum < 4; ++pointNum)
@@ -71,12 +86,30 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 
 
 		float step = 0.01f;
-		FVector prev = Config->ControlPoints[State.CurrentTraversalSegment].Location;
+		FVector prev = TraversalStart;
 		for (State.Time = 0.0f; State.Time <= 1.0f; State.Time += step)
 		{
 			FVector sample = Sample(State);
 			DrawDebugLine(Actor->GetWorld(), prev, sample, FColor::Blue, false, 1.0f);
 			prev = sample;
+		}
+
+		// Draw the Undulation times
+		FVector TraversalChord = TraversalEnd - TraversalStart;
+		FVector TraversalDir = TraversalChord.GetSafeNormal();
+		for (float U : State.UndulationTimes)
+		{
+			if (U <= 0.0f)
+			{
+				continue;
+			}
+			FVector ExtremePt = SampleExplicit(State, U);
+
+			FVector EPRelative = ExtremePt - TraversalStart;
+			FVector FromPt = TraversalStart + (TraversalDir * EPRelative.Dot(TraversalDir));
+
+			DrawDebugLine(Actor->GetWorld(), FromPt, ExtremePt, FColor::Yellow,false, 1.0f);
+
 		}
 	}
 #endif

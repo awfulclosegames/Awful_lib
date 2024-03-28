@@ -46,6 +46,9 @@ struct FKBSplineState
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Time = 0.0f;
 
+#if !UE_BUILD_SHIPPING
+	float UndulationTimes[2] = { -1.0f, -1.0f };
+#endif
 	FKBSplineState();
 };
 

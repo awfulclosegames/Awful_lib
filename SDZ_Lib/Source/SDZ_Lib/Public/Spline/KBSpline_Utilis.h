@@ -20,6 +20,7 @@ private:
 	{
 		FVector RawPoints[4];
 		FVector Points[4];
+		FVector Coeffs[4];
 		float Tau[2];
 		float Beta[2];
 		float A;
@@ -29,6 +30,7 @@ private:
 		float Deltas[3];
 
 		void Localize();
+		void AlignToX();
 	};
 	enum DeltaIndex
 	{
@@ -37,7 +39,11 @@ private:
 		next = 2,
 	};
 
-	static void GenerateCoeffisients(ParameterBlock& Block, TArray<FVector>& Coeffs);
-
 	static void Populate(ParameterBlock& Block, const FKBSplinePoint& P0, const FKBSplinePoint& P1, const FKBSplinePoint& P2, const FKBSplinePoint& P3);
+	static void GenerateCoeffisients(FVector points[4], ParameterBlock& Block, FVector Coeffs[4]);
+	static void ComputeUndulationTimes(float UndulationTimes[2], const ParameterBlock& Block);
+	static bool RestrictToBounds(const float UndulationTimes[2], const ParameterBlock& Block);
+
+	// wierd that there doesn't seem to be a built in function
+	static void BoundQuadraticRoots(float A, float B, float X, float& Root0, float& Root1);
 };
