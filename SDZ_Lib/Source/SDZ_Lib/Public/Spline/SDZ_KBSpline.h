@@ -18,8 +18,11 @@ class SDZ_LIB_API USDZ_KBSpline : public UBlueprintFunctionLibrary
 public:
 
 	UFUNCTION(BlueprintCallable)
-	static void AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point);
-	
+	static int AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point);
+
+	UFUNCTION(BlueprintCallable)
+	static void AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds Bound, int SegmentID);
+
 	UFUNCTION(BlueprintCallable)
 	static UKBSplineConfig* CreateSplineConfig(FVector Location);
 

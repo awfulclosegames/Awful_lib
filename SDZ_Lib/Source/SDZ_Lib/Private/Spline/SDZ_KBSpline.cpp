@@ -18,10 +18,23 @@ UKBSplineConfig* USDZ_KBSpline::CreateSplineConfig(FVector Location)
 	return nullptr;
 }
 
-void USDZ_KBSpline::AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point)
+int USDZ_KBSpline::AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point)
+{
+	int Segment = -1;
+	if (IsValid(Config))
+	{
+		Segment = Config->ControlPoints.Num();
+		Config->ControlPoints.Add(Point);
+	}
+	return Segment;
+}
+
+void USDZ_KBSpline::AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds Bound, int SegmentID)
 {
 	if (IsValid(Config))
-		Config->ControlPoints.Add(Point);
+	{
+		Config->SegmentBounds.FindOrAdd(SegmentID) = Bound;
+	}
 }
 
 FKBSplineState USDZ_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int PointID)
@@ -109,7 +122,6 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 			FVector FromPt = TraversalStart + (TraversalDir * EPRelative.Dot(TraversalDir));
 
 			DrawDebugLine(Actor->GetWorld(), FromPt, ExtremePt, FColor::Yellow,false, 1.0f);
-
 		}
 	}
 #endif

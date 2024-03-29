@@ -27,9 +27,13 @@ struct FKBSplineBounds
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float BoundMin = 0.0f;
+	FVector FromBoundMax;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float BoundMax = 0.0f;
+	FVector FromBoundMin;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector ToBoundMax;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector ToBoundMin;
 };
 
 // should this be a class instead of struct so I don't need to copy 36 bytes all the time?
@@ -62,7 +66,7 @@ public:
 	TArray<FKBSplinePoint> ControlPoints;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<FKBSplineBounds> ControlPointBounds;
+	TMap<int, FKBSplineBounds> SegmentBounds;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FKBSplinePoint OriginPoint;
