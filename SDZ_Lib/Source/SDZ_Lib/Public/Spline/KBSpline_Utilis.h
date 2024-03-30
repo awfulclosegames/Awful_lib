@@ -10,10 +10,11 @@ class KBSplineUtils
 public:
 
 
-	static bool Prepare(const UKBSplineConfig& Config, FKBSplineState& State);
+	static bool Prepare(const UKBSplineConfig& Config, FKBSplineState& State );
 
 
 	static FVector Sample(const FVector Coeffs[4], float Time);
+
 
 private:
 

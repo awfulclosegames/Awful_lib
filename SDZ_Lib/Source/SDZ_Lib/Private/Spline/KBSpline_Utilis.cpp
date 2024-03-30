@@ -1,13 +1,12 @@
 ﻿#include "Spline/KBSpline_Utilis.h"
 
 #include "GenericPlatform/GenericPlatformMath.h"
-#pragma optimize ("",off)
 
 // NOTES:
 //  -Not quite agnostic code, Exposing some unneeded Unreal concepts here
 //  -I don't love the parameter management through this. 
 
-bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State)
+bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State )
 {
 	// is the requested index valid to work with?
 	if (State.CurrentTraversalSegment <= 0 || State.CurrentTraversalSegment >= (Config.ControlPoints.Num() - 2))
@@ -28,10 +27,13 @@ bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State
 
 	// if there seems like valid constraints for this section the we want to constrain
 	// the spline
-	if (auto Bound = Config.SegmentBounds.Find(State.CurrentTraversalSegment))
+    if (auto Bound = Config.SegmentBounds.Find(State.CurrentTraversalSegment))
 	{
 		// we have some constraints so try and adjust the tensioning
-
+#if !UE_BUILD_SHIPPING
+        // record the original curve state for debugging
+        GenerateCoeffisients(Block.RawPoints, Block, State.OriginalCoeffs);
+#endif
 		// start by normalizing for the intended segment (cluster of four points)
 		// against the current segment start p1
         Block.Localize(*Bound);
@@ -54,7 +56,9 @@ bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State
             ExceedsBounds = RestrictToBounds(UndulationTimes, Block);
 
 #if !UE_BUILD_SHIPPING
-            if (ExceedsBounds)
+            // for debugging I should record all iterations but for now
+            // just the first ones 
+            if (Attempts == 3)
             {
                 State.UndulationTimes[0] = UndulationTimes[0];
                 State.UndulationTimes[1] = UndulationTimes[1];
@@ -162,12 +166,12 @@ bool KBSplineUtils::RestrictToBounds(const float UndulationTimes[2], ParameterBl
     // and bounding test
     auto EnforceBoundry = [&Block](float Time)
         {
-            FVector ExtremePoint = Sample(Block.Points, Time);
+            FVector ExtremePoint = Sample(Block.Coeffs, Time);
             FVector RestrictedPoint;
 
             if (ExceedsBound(Block.Bounds, ExtremePoint, RestrictedPoint))
             {
-                if (Time > 0.5f)
+                if (Time < 0.5f)
                 {
                     TightenStart(RestrictedPoint, Time, Block);
                 }

@@ -52,6 +52,7 @@ struct FKBSplineState
 
 #if !UE_BUILD_SHIPPING
 	float UndulationTimes[2] = { -1.0f, -1.0f };
+	FVector OriginalCoeffs[4] = { {0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 #endif
 	FKBSplineState();
 };

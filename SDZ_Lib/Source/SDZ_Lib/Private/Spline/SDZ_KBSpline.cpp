@@ -37,7 +37,7 @@ void USDZ_KBSpline::AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBound
 	}
 }
 
-FKBSplineState USDZ_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int PointID)
+FKBSplineState USDZ_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int PointID )
 {
 	if (IsValid(Config) && Config->IsValidSegment(PointID))
 	{
@@ -86,7 +86,6 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 	if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
 	{
 		const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
-		const FVector TraversalEnd = Config->ControlPoints[State.CurrentTraversalSegment + 1].Location;
 		int CPIdx = State.CurrentTraversalSegment - 1;
 		FVector prevPoint = Config->ControlPoints[CPIdx].Location;
 		for (int pointNum = 0; pointNum < 4; ++pointNum)
@@ -100,29 +99,58 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 
 		float step = 0.01f;
 		FVector prev = TraversalStart;
-		for (State.Time = 0.0f; State.Time <= 1.0f; State.Time += step)
+		for (float Time = 0.0f; Time <= 1.0f; Time += step)
 		{
-			FVector sample = Sample(State);
+			FVector sample = SampleExplicit(State, Time);
 			DrawDebugLine(Actor->GetWorld(), prev, sample, FColor::Blue, false, 1.0f);
 			prev = sample;
 		}
 
-		// Draw the Undulation times
-		FVector TraversalChord = TraversalEnd - TraversalStart;
-		FVector TraversalDir = TraversalChord.GetSafeNormal();
-		for (float U : State.UndulationTimes)
-		{
-			if (U <= 0.0f)
-			{
-				continue;
-			}
-			FVector ExtremePt = SampleExplicit(State, U);
-
-			FVector EPRelative = ExtremePt - TraversalStart;
-			FVector FromPt = TraversalStart + (TraversalDir * EPRelative.Dot(TraversalDir));
-
-			DrawDebugLine(Actor->GetWorld(), FromPt, ExtremePt, FColor::Yellow,false, 1.0f);
-		}
+		DrawDebugConstraints(Actor, Config, State);
 	}
 #endif
 }
+
+#if !UE_BUILD_SHIPPING
+void USDZ_KBSpline::DrawDebugConstraints(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State)
+{
+	if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
+	{
+		if (const auto* Bounds = Config->SegmentBounds.Find(State.CurrentTraversalSegment))
+		{
+			DrawDebugLine(Actor->GetWorld(), Bounds->FromBoundMin, Bounds->ToBoundMin, FColor::Red, false, 1.0f);
+			DrawDebugLine(Actor->GetWorld(), Bounds->FromBoundMax, Bounds->ToBoundMax, FColor::Red, false, 1.0f);
+
+			float step = 0.01f;
+			FVector prev = KBSplineUtils::Sample(State.OriginalCoeffs, 0.0f);
+			for (float Time = 0.0f; Time <= 1.0f; Time += step)
+			{
+				FVector sample = KBSplineUtils::Sample(State.OriginalCoeffs, Time);
+				DrawDebugLine(Actor->GetWorld(), prev, sample, FColor::Orange, false, 1.0f);
+				prev = sample;
+			}
+
+			// Draw the Undulation times
+			const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
+			const FVector TraversalEnd = Config->ControlPoints[State.CurrentTraversalSegment + 1].Location;
+
+			FVector TraversalChord = TraversalEnd - TraversalStart;
+			FVector TraversalDir = TraversalChord.GetSafeNormal();
+			for (float U : State.UndulationTimes)
+			{
+				if (U <= 0.0f)
+				{
+					continue;
+				}
+				FVector ExtremePt = KBSplineUtils::Sample(State.OriginalCoeffs, U);
+
+				FVector EPRelative = ExtremePt - TraversalStart;
+				FVector FromPt = TraversalStart + (TraversalDir * EPRelative.Dot(TraversalDir));
+
+				DrawDebugLine(Actor->GetWorld(), FromPt, ExtremePt, FColor::Yellow, false, 1.0f);
+			}
+
+		}
+	}
+}
+#endif

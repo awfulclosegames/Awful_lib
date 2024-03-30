@@ -39,5 +39,9 @@ public:
 	static void DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State);
 
 private:
+#if !UE_BUILD_SHIPPING
+	static void DrawDebugConstraints(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State);
+
+#endif
 
 };
