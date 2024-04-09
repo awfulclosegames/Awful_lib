@@ -349,6 +349,27 @@ FVector KBSplineUtils::Sample(const FVector Coeffs[4], float Time)
     return (Coeffs[0] * tQb) + (Coeffs[1] * tSq) + (Coeffs[2] * Time) + (Coeffs[3]);
 }
 
+void KBSplineUtils::Split(UKBSplineConfig& Config, const FKBSplineState& State, float Alpha)
+{
+    float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
+    int CurrentStartId = State.CurrentTraversalSegment;
+    int CurrentDestId = CurrentStartId + 1;
+    
+    FKBSplinePoint NewDestPoint;
+    NewDestPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), A);
+    NewDestPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Tau * A);
+    NewDestPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Beta * A);
+    
+    // Insert the new point between the current and destination points
+    Config.ControlPoints.Insert(NewDestPoint, CurrentDestId);
+
+    // for now just duplicate the constraints. Not ideal but it's fine to start
+    if (auto Bounds = Config.SegmentBounds.Find(CurrentStartId))
+    {
+        Config.SegmentBounds.Add(CurrentDestId, *Bounds);
+    }
+}
+
 void KBSplineUtils::BoundQuadraticRoots(float A, float B, float C, float& Root0, float& Root1)
 {
     // good old qudratic formula

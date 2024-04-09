@@ -111,6 +111,14 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 #endif
 }
 
+void USDZ_KBSpline::Split(UKBSplineConfig* Config, FKBSplineState State, float Alpha)
+{
+	if (IsValid(Config))
+	{
+		KBSplineUtils::Split(*Config, State, Alpha);
+	}
+}
+
 #if !UE_BUILD_SHIPPING
 void USDZ_KBSpline::DrawDebugConstraints(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State)
 {

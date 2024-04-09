@@ -38,6 +38,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	static void DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State);
 
+	UFUNCTION(BlueprintCallable)
+	static void Split(UKBSplineConfig* Config, FKBSplineState State, float Alpha);
+
 private:
 #if !UE_BUILD_SHIPPING
 	static void DrawDebugConstraints(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State);
