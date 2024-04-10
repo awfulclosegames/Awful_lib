@@ -70,8 +70,11 @@ bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State
 
     State.PrecomputedCoefficients.Empty();
     State.PrecomputedCoefficients.SetNum(4);
-
-	GenerateCoeffisients(Block.RawPoints, Block, &State.PrecomputedCoefficients[0]);
+    State.Tau[0] = Block.Tau[0];
+    State.Tau[1] = Block.Tau[1];
+    State.Beta[0] = Block.Beta[0];
+    State.Beta[1] = Block.Beta[1];
+    GenerateCoeffisients(Block.RawPoints, Block, State.PrecomputedCoefficients.GetData());
 	State.Time = 0.0f;
 
 	return true;
@@ -349,7 +352,7 @@ FVector KBSplineUtils::Sample(const FVector Coeffs[4], float Time)
     return (Coeffs[0] * tQb) + (Coeffs[1] * tSq) + (Coeffs[2] * Time) + (Coeffs[3]);
 }
 
-void KBSplineUtils::Split(UKBSplineConfig& Config, const FKBSplineState& State, float Alpha)
+void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha)
 {
     float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
     int CurrentStartId = State.CurrentTraversalSegment;
@@ -357,8 +360,8 @@ void KBSplineUtils::Split(UKBSplineConfig& Config, const FKBSplineState& State, 
     
     FKBSplinePoint NewDestPoint;
     NewDestPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), A);
-    NewDestPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Tau * A);
-    NewDestPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Beta * A);
+    NewDestPoint.Tau = (State.Tau[0] * (1.0f - A)) + (State.Tau[1] * A);
+    NewDestPoint.Beta = (State.Beta[0] * (1.0f - A)) + (State.Beta[1] * A);
     
     // Insert the new point between the current and destination points
     Config.ControlPoints.Insert(NewDestPoint, CurrentDestId);
@@ -368,6 +371,26 @@ void KBSplineUtils::Split(UKBSplineConfig& Config, const FKBSplineState& State, 
     {
         Config.SegmentBounds.Add(CurrentDestId, *Bounds);
     }
+
+    // now update the state
+    ParameterBlock Block;
+    Populate(Block, Config.ControlPoints[CurrentStartId-1],
+        Config.ControlPoints[CurrentStartId], 
+        Config.ControlPoints[CurrentStartId + 1], 
+        Config.ControlPoints[CurrentStartId + 2]);
+
+    // Slight hack, since we've already run the restriction we know what the p1 tau should 
+    // be so set it from the state and recompute A,B
+    Block.Tau[0] = State.Tau[0];
+    Block.Beta[0] = State.Beta[0];
+    ComputeAB(Block);
+
+    State.Tau[1] = NewDestPoint.Tau;
+    State.Beta[1] = NewDestPoint.Beta;
+
+    GenerateCoeffisients(Block.RawPoints, Block, State.PrecomputedCoefficients.GetData());
+    float NewTime = State.Time / (Alpha > 0.0f ? Alpha : 1000000.0f);
+    State.Time = FMath::Clamp(NewTime, 0.0f, 1.0f);
 }
 
 void KBSplineUtils::BoundQuadraticRoots(float A, float B, float C, float& Root0, float& Root1)

@@ -50,6 +50,16 @@ struct FKBSplineState
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Time = 0.0f;
 
+	// ************************************************************************
+	// SUPPLIMENTARY STATE
+	// ************************************************************************
+	// 
+	// I don't love putting this here, but since the restriction may change the
+	// tensioning I need to store it after success. Ideally I should split off 
+	// core state and supplimentary state since this isn't needed for sampling
+	float Tau[2];
+	float Beta[2];
+
 #if !UE_BUILD_SHIPPING
 	float UndulationTimes[2] = { -1.0f, -1.0f };
 	FVector OriginalCoeffs[4] = { {0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };

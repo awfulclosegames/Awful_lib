@@ -13,7 +13,7 @@ public:
 	static bool Prepare(const UKBSplineConfig& Config, FKBSplineState& State );
 	static FVector Sample(const FVector Coeffs[4], float Time);
 
-	static void Split(UKBSplineConfig& Config, const FKBSplineState& State, float Alpha);
+	static void Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha);
 
 
 private:

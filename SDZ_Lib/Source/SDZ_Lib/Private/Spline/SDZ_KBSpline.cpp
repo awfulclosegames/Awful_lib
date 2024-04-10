@@ -78,7 +78,7 @@ FVector USDZ_KBSpline::SampleExplicit(FKBSplineState State, float Completion)
 	return SamplePoint;
 }
 
-void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State)
+void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour)
 {
 #if !UE_BUILD_SHIPPING
 	if (!CVarSDZ_SplineDebug.GetValueOnGameThread())
@@ -102,7 +102,7 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 		for (float Time = 0.0f; Time <= 1.0f; Time += step)
 		{
 			FVector sample = SampleExplicit(State, Time);
-			DrawDebugLine(Actor->GetWorld(), prev, sample, FColor::Blue, false, 1.0f);
+			DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f);
 			prev = sample;
 		}
 
