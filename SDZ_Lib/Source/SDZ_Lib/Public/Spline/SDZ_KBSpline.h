@@ -36,10 +36,10 @@ public:
 	static FVector SampleExplicit(FKBSplineState State, float Completion);
 
 	UFUNCTION(BlueprintCallable)
-	static void DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour = FColor::Blue);
+	static void DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour = FColor::Blue, float Width = 0.0f);
 
 	UFUNCTION(BlueprintCallable)
-	static void Split(UKBSplineConfig* Config, FKBSplineState State, float Alpha);
+	static FKBSplineState Split(UKBSplineConfig* Config, const FKBSplineState State, float Alpha);
 
 private:
 #if !UE_BUILD_SHIPPING

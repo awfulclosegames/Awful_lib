@@ -78,7 +78,7 @@ FVector USDZ_KBSpline::SampleExplicit(FKBSplineState State, float Completion)
 	return SamplePoint;
 }
 
-void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour)
+void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour, float Width)
 {
 #if !UE_BUILD_SHIPPING
 	if (!CVarSDZ_SplineDebug.GetValueOnGameThread())
@@ -102,7 +102,7 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 		for (float Time = 0.0f; Time <= 1.0f; Time += step)
 		{
 			FVector sample = SampleExplicit(State, Time);
-			DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f);
+			DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f,0.0f, Width);
 			prev = sample;
 		}
 
@@ -111,12 +111,16 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 #endif
 }
 
-void USDZ_KBSpline::Split(UKBSplineConfig* Config, FKBSplineState State, float Alpha)
+FKBSplineState USDZ_KBSpline::Split(UKBSplineConfig* Config, const FKBSplineState State, float Alpha)
 {
+	FKBSplineState SplitState = State;
+
 	if (IsValid(Config))
 	{
-		KBSplineUtils::Split(*Config, State, Alpha);
+		KBSplineUtils::Split(*Config, SplitState, Alpha);
 	}
+
+	return SplitState;
 }
 
 #if !UE_BUILD_SHIPPING

@@ -366,7 +366,7 @@ void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float 
     // Insert the new point between the current and destination points
     Config.ControlPoints.Insert(NewDestPoint, CurrentDestId);
 
-    // for now just duplicate the constraints. Not ideal but it's fine to start
+    // for now just duplicate the cxonstraints. Not ideal but it's fine to start
     if (auto Bounds = Config.SegmentBounds.Find(CurrentStartId))
     {
         Config.SegmentBounds.Add(CurrentDestId, *Bounds);
@@ -381,9 +381,9 @@ void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float 
 
     // Slight hack, since we've already run the restriction we know what the p1 tau should 
     // be so set it from the state and recompute A,B
-    Block.Tau[0] = State.Tau[0];
-    Block.Beta[0] = State.Beta[0];
-    ComputeAB(Block);
+    //Block.Tau[0] = State.Tau[0];
+    //Block.Beta[0] = State.Beta[0];
+    //ComputeAB(Block);
 
     State.Tau[1] = NewDestPoint.Tau;
     State.Beta[1] = NewDestPoint.Beta;
