@@ -360,37 +360,58 @@ void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float 
     
     FKBSplinePoint NewDestPoint;
     NewDestPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), A);
-    NewDestPoint.Tau = (State.Tau[0] * (1.0f - A)) + (State.Tau[1] * A);
-    NewDestPoint.Beta = (State.Beta[0] * (1.0f - A)) + (State.Beta[1] * A);
-    
+    //NewDestPoint.Tau = (State.Tau[0] * (1.0f - A)) + (State.Tau[1] * A);
+    //NewDestPoint.Beta = (State.Beta[0] * (1.0f - A)) + (State.Beta[1] * A);
+    NewDestPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Tau * A);
+    NewDestPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Beta * A);
+
     // Insert the new point between the current and destination points
     Config.ControlPoints.Insert(NewDestPoint, CurrentDestId);
 
-    // for now just duplicate the cxonstraints. Not ideal but it's fine to start
-    if (auto Bounds = Config.SegmentBounds.Find(CurrentStartId))
+    if (State.Time > 0.0f)
     {
-        Config.SegmentBounds.Add(CurrentDestId, *Bounds);
+    // we want to split off a new segment entirely, so add a new start point
+        FKBSplinePoint NewStartPoint;
+        NewStartPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), State.Time);
+        NewStartPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - State.Time)) + (Config.ControlPoints[CurrentDestId].Tau * State.Time);
+        NewStartPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - State.Time)) + (Config.ControlPoints[CurrentDestId].Beta * State.Time);
+        Config.ControlPoints.Insert(NewStartPoint, CurrentDestId);
+        // since we just inserted a new point between the old start and dest our new start
+        // is our old dest ID
+        CurrentStartId = CurrentDestId;
     }
+    State.CurrentTraversalSegment = CurrentStartId;
+    Prepare(Config, State);
 
-    // now update the state
-    ParameterBlock Block;
-    Populate(Block, Config.ControlPoints[CurrentStartId-1],
-        Config.ControlPoints[CurrentStartId], 
-        Config.ControlPoints[CurrentStartId + 1], 
-        Config.ControlPoints[CurrentStartId + 2]);
-
-    // Slight hack, since we've already run the restriction we know what the p1 tau should 
-    // be so set it from the state and recompute A,B
-    //Block.Tau[0] = State.Tau[0];
-    //Block.Beta[0] = State.Beta[0];
-    //ComputeAB(Block);
-
-    State.Tau[1] = NewDestPoint.Tau;
-    State.Beta[1] = NewDestPoint.Beta;
-
-    GenerateCoeffisients(Block.RawPoints, Block, State.PrecomputedCoefficients.GetData());
     float NewTime = State.Time / (Alpha > 0.0f ? Alpha : 1000000.0f);
     State.Time = FMath::Clamp(NewTime, 0.0f, 1.0f);
+
+
+    //// for now just duplicate the cxonstraints. Not ideal but it's fine to start
+    //if (auto Bounds = Config.SegmentBounds.Find(CurrentStartId))
+    //{
+    //    Config.SegmentBounds.Add(CurrentDestId, *Bounds);
+    //}
+
+    //// now update the state
+    //ParameterBlock Block;
+    //Populate(Block, Config.ControlPoints[CurrentStartId-1],
+    //    Config.ControlPoints[CurrentStartId], 
+    //    Config.ControlPoints[CurrentStartId + 1], 
+    //    Config.ControlPoints[CurrentStartId + 2]);
+
+    //// Slight hack, since we've already run the restriction we know what the p1 tau should 
+    //// be so set it from the state and recompute A,B
+    ////Block.Tau[0] = State.Tau[0];
+    ////Block.Beta[0] = State.Beta[0];
+    ////ComputeAB(Block);
+
+    //State.Tau[1] = NewDestPoint.Tau;
+    //State.Beta[1] = NewDestPoint.Beta;
+
+    //GenerateCoeffisients(Block.RawPoints, Block, State.PrecomputedCoefficients.GetData());
+    //float NewTime = State.Time / (Alpha > 0.0f ? Alpha : 1000000.0f);
+    //State.Time = FMath::Clamp(NewTime, 0.0f, 1.0f);
 }
 
 void KBSplineUtils::BoundQuadraticRoots(float A, float B, float C, float& Root0, float& Root1)
