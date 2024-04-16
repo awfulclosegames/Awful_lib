@@ -10,7 +10,7 @@ class KBSplineUtils
 public:
 
 
-	static bool Prepare(const UKBSplineConfig& Config, FKBSplineState& State );
+	static bool Prepare(const UKBSplineConfig& Config, FKBSplineState& State, bool bIgnoreBoundes = false);
 	static FVector Sample(const FVector Coeffs[4], float Time);
 
 	static void Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha);
@@ -55,6 +55,7 @@ private:
 	static void ComputeUndulationTimes(float UndulationTimes[2], const ParameterBlock& Block);
 	static bool RestrictToBounds(const float UndulationTimes[2], ParameterBlock& Block);
 
+	static void EnsureBoundingConstraint(const UKBSplineConfig& Config, FKBSplineState& State, ParameterBlock& Block);
 
 	static bool ExceedsBound(const FVector Bounds[4], const FVector TestPoint, FVector& RestrictedPoint);
 	static void TightenStart(const FVector& RestrictedPoint, float t, ParameterBlock& Block);

@@ -60,9 +60,11 @@ struct FKBSplineState
 	float Tau[2];
 	float Beta[2];
 
-#if !UE_BUILD_SHIPPING
 	float UndulationTimes[2] = { -1.0f, -1.0f };
+
+#if !UE_BUILD_SHIPPING
 	FVector OriginalCoeffs[4] = { {0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	float OriginalUndulationTimes[2] = { -1.0f, -1.0f };
 #endif
 	FKBSplineState();
 };

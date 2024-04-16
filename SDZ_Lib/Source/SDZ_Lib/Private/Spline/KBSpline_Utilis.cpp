@@ -6,7 +6,7 @@
 //  -Not quite agnostic code, Exposing some unneeded Unreal concepts here
 //  -I don't love the parameter management through this. 
 
-bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State )
+bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State, bool bIgnoreBoundes)
 {
 	// is the requested index valid to work with?
 	if (State.CurrentTraversalSegment <= 0 || State.CurrentTraversalSegment >= (Config.ControlPoints.Num() - 2))
@@ -27,46 +27,10 @@ bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State
 
 	// if there seems like valid constraints for this section the we want to constrain
 	// the spline
-    if (auto Bound = Config.SegmentBounds.Find(State.CurrentTraversalSegment))
-	{
-		// we have some constraints so try and adjust the tensioning
-#if !UE_BUILD_SHIPPING
-        // record the original curve state for debugging
-        GenerateCoeffisients(Block.RawPoints, Block, State.OriginalCoeffs);
-#endif
-		// start by normalizing for the intended segment (cluster of four points)
-		// against the current segment start p1
-        Block.Localize(*Bound);
-        // the rotation of the system onto the X axis isn't really needed but being able 
-        // to do all the rest of the actions exclusively on the Y axis is ver convenient
-        Block.AlignToX();
-
-        int Attempts = 4;
-        float UndulationTimes[2] = { 0.0f, 0.0f };
-        bool ExceedsBounds = true;
-        while (ExceedsBounds && Attempts > 0)
-        {
-            --Attempts;
-            // update the local coefficients
-            GenerateCoeffisients(Block.Points, Block, Block.Coeffs);
-            // find the undulation points to identify the extremes
-            ComputeUndulationTimes(UndulationTimes, Block);
-            // test them against the bounds and then cinch in the tension 
-            // if the curve exceedes the bounds
-            ExceedsBounds = RestrictToBounds(UndulationTimes, Block);
-
-#if !UE_BUILD_SHIPPING
-            // for debugging I should record all iterations but for now
-            // just the first ones 
-            if (Attempts == 3)
-            {
-                State.UndulationTimes[0] = UndulationTimes[0];
-                State.UndulationTimes[1] = UndulationTimes[1];
-            }
-#endif
-        }
+    if (!bIgnoreBoundes)
+    {
+        EnsureBoundingConstraint(Config, State, Block);
     }
-
 
     State.PrecomputedCoefficients.Empty();
     State.PrecomputedCoefficients.SetNum(4);
@@ -193,6 +157,51 @@ bool KBSplineUtils::RestrictToBounds(const float UndulationTimes[2], ParameterBl
     }
 
     return EnforceBoundry(UndulationTimes[1]);
+}
+
+void KBSplineUtils::EnsureBoundingConstraint(const UKBSplineConfig& Config, FKBSplineState& State, ParameterBlock& Block)
+{
+    if (auto Bound = Config.SegmentBounds.Find(State.CurrentTraversalSegment))
+    {
+        // we have some constraints so try and adjust the tensioning
+#if !UE_BUILD_SHIPPING
+        // record the original curve state for debugging
+        GenerateCoeffisients(Block.RawPoints, Block, State.OriginalCoeffs);
+#endif
+        // start by normalizing for the intended segment (cluster of four points)
+        // against the current segment start p1
+        Block.Localize(*Bound);
+        // the rotation of the system onto the X axis isn't really needed but being able 
+        // to do all the rest of the actions exclusively on the Y axis is ver convenient
+        Block.AlignToX();
+
+        int Attempts = 4;
+        float UndulationTimes[2] = { 0.0f, 0.0f };
+        bool ExceedsBounds = true;
+        while (ExceedsBounds && Attempts > 0)
+        {
+            --Attempts;
+            // update the local coefficients
+            GenerateCoeffisients(Block.Points, Block, Block.Coeffs);
+            // find the undulation points to identify the extremes
+            ComputeUndulationTimes(UndulationTimes, Block);
+            // test them against the bounds and then cinch in the tension 
+            // if the curve exceedes the bounds
+            ExceedsBounds = RestrictToBounds(UndulationTimes, Block);
+            State.UndulationTimes[0] = UndulationTimes[0];
+            State.UndulationTimes[1] = UndulationTimes[1];
+
+#if !UE_BUILD_SHIPPING
+            // for debugging I should record all iterations but for now
+            // just the first ones 
+            if (Attempts == 3)
+            {
+                State.OriginalUndulationTimes[0] = UndulationTimes[0];
+                State.OriginalUndulationTimes[1] = UndulationTimes[1];
+            }
+#endif
+        }
+    }
 }
 
 bool KBSplineUtils::ExceedsBound(const FVector Bounds[4], FVector TestPoint, FVector& RestrictedPoint)
@@ -354,16 +363,15 @@ FVector KBSplineUtils::Sample(const FVector Coeffs[4], float Time)
 
 void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha)
 {
-    float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
+    // lets try and keep this light
+        float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
     int CurrentStartId = State.CurrentTraversalSegment;
     int CurrentDestId = CurrentStartId + 1;
     
     FKBSplinePoint NewDestPoint;
     NewDestPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), A);
-    //NewDestPoint.Tau = (State.Tau[0] * (1.0f - A)) + (State.Tau[1] * A);
-    //NewDestPoint.Beta = (State.Beta[0] * (1.0f - A)) + (State.Beta[1] * A);
-    NewDestPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Tau * A);
-    NewDestPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Beta * A);
+    NewDestPoint.Tau = (State.Tau[0] * (1.0f - A)) + (State.Tau[1] * A);
+    NewDestPoint.Beta = (State.Beta[0] * (1.0f - A)) + (State.Beta[1] * A);
 
     // Insert the new point between the current and destination points
     Config.ControlPoints.Insert(NewDestPoint, CurrentDestId);
@@ -379,40 +387,101 @@ void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float 
         // since we just inserted a new point between the old start and dest our new start
         // is our old dest ID
         CurrentStartId = CurrentDestId;
+        ++CurrentDestId;
     }
+
+    // split the curve up, this could be done better but this should maintain the 
+    // shape and also be cheap
+    // except for the buffer insertion, but I can fix that later
+
+    // if the undulation points are in our cliping, then add them as separate points
+    for (int i = 0; i < 2; ++i)
+    {
+        float currentUndulation = State.UndulationTimes[i];
+        if (currentUndulation > State.Time && currentUndulation < A)
+        {
+            FKBSplinePoint NewUndulationPoint;
+            // We haven't recomputed the coefficients yet so this will be the correct point for the 
+            // undulation on the old spline
+            NewUndulationPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), currentUndulation);
+            NewUndulationPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - currentUndulation)) + (Config.ControlPoints[CurrentDestId].Tau * currentUndulation);
+            NewUndulationPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - currentUndulation)) + (Config.ControlPoints[CurrentDestId].Beta * currentUndulation);
+            Config.ControlPoints.Insert(NewUndulationPoint, CurrentDestId);
+
+            State.UndulationTimes[i] -= State.Time;
+            continue;
+        }
+        State.UndulationTimes[i] = -1.0f;
+    }
+
+    State.Time = 0.0f;
     State.CurrentTraversalSegment = CurrentStartId;
-    Prepare(Config, State);
 
-    float NewTime = State.Time / (Alpha > 0.0f ? Alpha : 1000000.0f);
-    State.Time = FMath::Clamp(NewTime, 0.0f, 1.0f);
-
-
-    //// for now just duplicate the cxonstraints. Not ideal but it's fine to start
-    //if (auto Bounds = Config.SegmentBounds.Find(CurrentStartId))
-    //{
-    //    Config.SegmentBounds.Add(CurrentDestId, *Bounds);
-    //}
-
-    //// now update the state
-    //ParameterBlock Block;
-    //Populate(Block, Config.ControlPoints[CurrentStartId-1],
-    //    Config.ControlPoints[CurrentStartId], 
-    //    Config.ControlPoints[CurrentStartId + 1], 
-    //    Config.ControlPoints[CurrentStartId + 2]);
-
-    //// Slight hack, since we've already run the restriction we know what the p1 tau should 
-    //// be so set it from the state and recompute A,B
-    ////Block.Tau[0] = State.Tau[0];
-    ////Block.Beta[0] = State.Beta[0];
-    ////ComputeAB(Block);
-
-    //State.Tau[1] = NewDestPoint.Tau;
-    //State.Beta[1] = NewDestPoint.Beta;
-
-    //GenerateCoeffisients(Block.RawPoints, Block, State.PrecomputedCoefficients.GetData());
-    //float NewTime = State.Time / (Alpha > 0.0f ? Alpha : 1000000.0f);
-    //State.Time = FMath::Clamp(NewTime, 0.0f, 1.0f);
+    // now recompute the coefficients and update the state tau/beta
+    Prepare(Config, State, true);
 }
+
+//void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha)
+//{
+//    float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
+//    int CurrentStartId = State.CurrentTraversalSegment;
+//    int CurrentDestId = CurrentStartId + 1;
+//    
+//    FKBSplinePoint NewDestPoint;
+//    NewDestPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), A);
+//    //NewDestPoint.Tau = (State.Tau[0] * (1.0f - A)) + (State.Tau[1] * A);
+//    //NewDestPoint.Beta = (State.Beta[0] * (1.0f - A)) + (State.Beta[1] * A);
+//    NewDestPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Tau * A);
+//    NewDestPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - A)) + (Config.ControlPoints[CurrentDestId].Beta * A);
+//
+//    // Insert the new point between the current and destination points
+//    Config.ControlPoints.Insert(NewDestPoint, CurrentDestId);
+//
+//    if (State.Time > 0.0f)
+//    {
+//    // we want to split off a new segment entirely, so add a new start point
+//        FKBSplinePoint NewStartPoint;
+//        NewStartPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), State.Time);
+//        NewStartPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - State.Time)) + (Config.ControlPoints[CurrentDestId].Tau * State.Time);
+//        NewStartPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - State.Time)) + (Config.ControlPoints[CurrentDestId].Beta * State.Time);
+//        Config.ControlPoints.Insert(NewStartPoint, CurrentDestId);
+//        // since we just inserted a new point between the old start and dest our new start
+//        // is our old dest ID
+//        CurrentStartId = CurrentDestId;
+//    }
+//    State.CurrentTraversalSegment = CurrentStartId;
+//    Prepare(Config, State);
+//
+//    float NewTime = State.Time / (Alpha > 0.0f ? Alpha : 1000000.0f);
+//    State.Time = FMath::Clamp(NewTime, 0.0f, 1.0f);
+//
+//
+//    //// for now just duplicate the cxonstraints. Not ideal but it's fine to start
+//    //if (auto Bounds = Config.SegmentBounds.Find(CurrentStartId))
+//    //{
+//    //    Config.SegmentBounds.Add(CurrentDestId, *Bounds);
+//    //}
+//
+//    //// now update the state
+//    //ParameterBlock Block;
+//    //Populate(Block, Config.ControlPoints[CurrentStartId-1],
+//    //    Config.ControlPoints[CurrentStartId], 
+//    //    Config.ControlPoints[CurrentStartId + 1], 
+//    //    Config.ControlPoints[CurrentStartId + 2]);
+//
+//    //// Slight hack, since we've already run the restriction we know what the p1 tau should 
+//    //// be so set it from the state and recompute A,B
+//    ////Block.Tau[0] = State.Tau[0];
+//    ////Block.Beta[0] = State.Beta[0];
+//    ////ComputeAB(Block);
+//
+//    //State.Tau[1] = NewDestPoint.Tau;
+//    //State.Beta[1] = NewDestPoint.Beta;
+//
+//    //GenerateCoeffisients(Block.RawPoints, Block, State.PrecomputedCoefficients.GetData());
+//    //float NewTime = State.Time / (Alpha > 0.0f ? Alpha : 1000000.0f);
+//    //State.Time = FMath::Clamp(NewTime, 0.0f, 1.0f);
+//}
 
 void KBSplineUtils::BoundQuadraticRoots(float A, float B, float C, float& Root0, float& Root1)
 {
