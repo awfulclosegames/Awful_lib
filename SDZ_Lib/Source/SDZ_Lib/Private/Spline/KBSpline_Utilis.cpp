@@ -340,6 +340,132 @@ void KBSplineUtils::TightenEnd(const FVector& RestrictedPoint, float t, Paramete
     ComputeCD(Block);
 }
 
+void KBSplineUtils::MatchSlopeAtStart()
+{
+    /*
+    float e, f;
+    e = 0.5 * (beta_2 + 1.0) * (-tau_2 + 1.0);
+    f = 0.5 * (-beta_2 + 1.0) * (-tau_2 + 1.0);
+    {
+        u0 = beta_2 + 1;
+        u1 = pow(delta_cur, 3.0);
+        u2 = pow(delta_cur, 2.0);
+        u3 = pow(delta_next, 2.0);
+        u4 = -beta_2;
+        u5 = u4 - 1;
+        u6 = u4 + 1;
+        u7 = pow(delta_prev, 2.0);
+        u8 = beta_2 - 1;
+        u9 = (u8 * u3 + u8 * delta_cur * delta_next) * u7 * p4;
+        u10 = -4 * beta_2;
+        u11 = u10 - 4;
+        u12 = (u11 * u2 * u3 + u11 * u1 * delta_next) * p0;
+        u13 = 4 * beta_2;
+        u14 = u13 + 4;
+        u15 = u14 * u1 * delta_next;
+        u16 = u14 * u2 * u3;
+        u17 = u13 - 4;
+        u18 = u10 + 4;
+        u19 = 3 * beta_2;
+        u20 = u19 + 3;
+        u21 = (u20 * u2 * u3 + u20 * u1 * delta_next) * p0;
+        u22 = -3 * beta_2;
+        u23 = u22 - 3;
+        u24 = u23 * u1 * delta_next;
+        u25 = u23 * u2 * u3;
+        u26 = u22 + 3;
+        u27 = u19 - 3;
+        u28 = pow(r, 2.0);
+        u29 = beta_2 - 2 * a + 1;
+        u30 = u4 + 2 * a - 1;
+        u31 = u4 - 2 * b + 1;
+        u32 = 12 * u2 * delta_next;
+        u33 = -4 * c;
+        u34 = (u33 + 12) * delta_cur * u3;
+        u35 = -12 * u2 * delta_next;
+        u36 = 4 * c;
+        u37 = (u36 - 12) * delta_cur * u3;
+        u38 = 6 * c;
+        u39 = (u38 - 12) * delta_cur * u3;
+        u40 = -6 * c;
+        u41 = (u40 + 12) * delta_cur * u3;
+        u42 = 8 * b;
+        u43 = -8 * b;
+        u44 = -6 * b;
+        u45 = 6 * b;
+        tau_2 = (((6 * d * u2 * u7 + 6 * d * u1 * delta_prev) * p3 + (((u38 + u45 - 12) * u3 + (u45 - 12) * delta_cur * delta_next - 6 * d * u2) * u7 + (u39 + u35 - 6 * d * u1) * delta_prev) * p2 + (((u40 + u44 + 12) * u3 + (
+            u44 + 12) * delta_cur * delta_next) * u7 + (u41 + u32) * delta_prev + 6 * a * u2 * u3 + 6 * a * u1 * delta_next) * p1 + (-6 * a * u2 * u3 - 6 * a * u1 * delta_next) * p0) * pow(t, 2.0) + ((-4 * d * u2 * u7 - 4 * d * u1
+                * delta_prev) * p3 + (((u33 + u43 + 12) * u3 + (u43 + 12) * delta_cur * delta_next + 4 * d * u2) * u7 + (u34 + u32 + 4 * d * u1) * delta_prev) * p2 + (((u36 + u42 - 12) * u3 + (u42 - 12) * delta_cur *
+                    delta_next) * u7 + (u37 + u35) * delta_prev - 8 * a * u2 * u3 - 8 * a * u1 * delta_next) * p1 + (8 * a * u2 * u3 + 8 * a * u1 * delta_next) * p0) * t + ((((u40 + u19 + 9) * u3 + (u19 + 9) * delta_cur * delta_next +
+                        6 * d * u2) * u7 + (u41 + u32 + 6 * d * u1) * delta_prev) * p4 + (-6 * d * u2 * u7 - 6 * d * u1 * delta_prev) * p2 + (((u38 + u22 - 9) * u3 + (u22 - 9) * delta_cur * delta_next) * u7 + (u39 + u35) * delta_prev + u25
+                            + u24) * p1 + u21) * u28 + ((((u36 + u10 - 8) * u3 + (u10 - 8) * delta_cur * delta_next - 4 * d * u2) * u7 + (u37 + u35 - 4 * d * u1) * delta_prev) * p4 + (4 * d * u2 * u7 + 4 * d * u1 * delta_prev) * p2 + (((u33 + u13
+                                + 8) * u3 + (u13 + 8) * delta_cur * delta_next) * u7 + (u34 + u32) * delta_prev + u16 + u15) * p1 + u12) * r + u9 + (2 * b * u3 + 2 * b * delta_cur * delta_next) * u7 * p2 + ((u31 * u3 + u31 * delta_cur *
+                                    delta_next) * u7 + u30 * u2 * u3 + u30 * u1 * delta_next) * p1 + (u29 * u2 * u3 + u29 * u1 * delta_next) * p0) / (((u27 * u3 + u27 * delta_cur * delta_next) * u7 * p4 + ((u26 * u3 + u26 * delta_cur *
+                                        delta_next) * u7 + u25 + u24) * p1 + u21) * u28 + ((u18 * u3 + u18 * delta_cur * delta_next) * u7 * p4 + ((u17 * u3 + u17 * delta_cur * delta_next) * u7 + u16 + u15) * p1 + u12) * r + u9 + ((u6 * u3 + u6 *
+                                            delta_cur * delta_next) * u7 + u5 * u2 * u3 + u5 * u1 * delta_next) * p1 + (u0 * u2 * u3 + u0 * u1 * delta_next) * p0);
+    }
+    */
+}
+
+void KBSplineUtils::MatchSlopeAtEnd()
+{
+    /*
+    float g, h;
+    g = 0.5 * (beta_3 + 1.0) * (-tau_3 + 1.0);
+    h = 0.5 * (-beta_3 + 1.0) * (-tau_3 + 1.0);
+    {
+        u0 = 2 * beta_3;
+        u1 = u0 + 2;
+        u2 = pow(delta_next, 2.0);
+        u3 = pow(delta_prev, 2.0);
+        u4 = u0 - 2;
+        u5 = pow(delta_cur, 3.0);
+        u6 = pow(delta_cur, 2.0);
+        u7 = -2 * beta_3;
+        u8 = u7 + 2;
+        u9 = u7 - 2;
+        u10 = -3 * beta_3;
+        u11 = u10 - 3;
+        u12 = u10 + 3;
+        u13 = 3 * beta_3;
+        u14 = u13 - 3;
+        u15 = u13 + 3;
+        u16 = pow(r, 2.0);
+        u17 = -8 * a * u5 * delta_next;
+        u18 = -8 * a * u6 * u2;
+        u19 = 8 * a * u5 * delta_next;
+        u20 = 8 * a * u6 * u2;
+        u21 = 12 * u6 * delta_next;
+        u22 = -8 * b;
+        u23 = (u22 + 12) * delta_cur * delta_next;
+        u24 = -12 * u6 * delta_next;
+        u25 = 8 * b;
+        u26 = (u25 - 12) * delta_cur * delta_next;
+        u27 = 6 * a * u5 * delta_next;
+        u28 = 6 * a * u6 * u2;
+        u29 = -6 * a * u5 * delta_next;
+        u30 = -6 * a * u6 * u2;
+        u31 = 6 * b;
+        u32 = (u31 - 12) * delta_cur * delta_next;
+        u33 = -6 * b;
+        u34 = (u33 + 12) * delta_cur * delta_next;
+        u35 = 4 * c;
+        u36 = -4 * c;
+        u37 = -6 * c;
+        u38 = 6 * c;
+        tau_3 = -(((6 * d * u6 * u3 + 6 * d * u5 * delta_prev) * p3 + (((u38 + u31 - 12) * u2 + u32 - 6 * d * u6) * u3 + ((u38 - 12) * delta_cur * u2 + u24 - 6 * d * u5) * delta_prev) * p2 + (((u37 + u33 + 12) * u2 + u34) * u3 + (
+            (u37 + 12) * delta_cur * u2 + u21) * delta_prev + u28 + u27) * p1 + (u30 + u29) * p0) * pow(t, 2.0) + ((-4 * d * u6 * u3 - 4 * d * u5 * delta_prev) * p3 + (((u36 + u22 + 12) * u2 + u23 + 4 * d * u6) * u3 + ((u36 + 12
+                ) * delta_cur * u2 + u21 + 4 * d * u5) * delta_prev) * p2 + (((u35 + u25 - 12) * u2 + u26) * u3 + ((u35 - 12) * delta_cur * u2 + u24) * delta_prev + u18 + u17) * p1 + (u20 + u19) * p0) * t + ((((u10 + u33 + 9) *
+                    u2 + u34 + u12 * u6) * u3 + ((u10 + 9) * delta_cur * u2 + u21 + u12 * u5) * delta_prev) * p4 + (u14 * u6 * u3 + u14 * u5 * delta_prev) * p2 + (((u13 + u31 - 9) * u2 + u32) * u3 + ((u13 - 9) * delta_cur * u2 + u24)
+                        * delta_prev + u30 + u29) * p1 + (u28 + u27) * p0) * u16 + ((((u0 + u25 - 10) * u2 + u26 + u4 * u6) * u3 + ((u0 - 10) * delta_cur * u2 + u24 + u4 * u5) * delta_prev) * p4 + (u8 * u6 * u3 + u8 * u5 * delta_prev) *
+                            p2 + (((u7 + u22 + 10) * u2 + u23) * u3 + ((u7 + 10) * delta_cur * u2 + u21) * delta_prev + u20 + u19) * p1 + (u18 + u17) * p0) * r + (-2 * b * u2 - 2 * b * delta_cur * delta_next) * u3 * p4 + (2 * b * u2 + 2 * b *
+                                delta_cur * delta_next) * u3 * p2) / ((((u15 * u2 + u14 * u6) * u3 + (u15 * delta_cur * u2 + u14 * u5) * delta_prev) * p4 + (u12 * u6 * u3 + u12 * u5 * delta_prev) * p2 + (u11 * u2 * u3 + u11 * delta_cur *
+                                    u2 * delta_prev) * p1) * u16 + (((u9 * u2 + u8 * u6) * u3 + (u9 * delta_cur * u2 + u8 * u5) * delta_prev) * p4 + (u4 * u6 * u3 + u4 * u5 * delta_prev) * p2 + (u1 * u2 * u3 + u1 * delta_cur * u2 * delta_prev) *
+                                        p1) * r);
+    }
+    */
+}
+
 void KBSplineUtils::ComputeAB(ParameterBlock& Block)
 {
     /* gamma is the continuity param)*/
