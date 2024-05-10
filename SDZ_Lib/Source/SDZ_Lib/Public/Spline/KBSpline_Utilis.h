@@ -61,7 +61,7 @@ private:
 	static void TightenStart(const FVector& RestrictedPoint, float t, ParameterBlock& Block);
 	static void TightenEnd(const FVector& RestrictedPoint, float t, ParameterBlock& Block);
 
-	static void MatchSlopeAtStart();
+	static void MatchSlopeAtStart(ParameterBlock& Block);
 	static void MatchSlopeAtEnd();
 
 	static void ComputeAB(ParameterBlock& Block);
