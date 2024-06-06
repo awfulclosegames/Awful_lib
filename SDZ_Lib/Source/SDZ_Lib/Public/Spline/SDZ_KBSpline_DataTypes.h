@@ -88,7 +88,7 @@ public:
 
 	UKBSplineConfig(FVector Location);
 
-	bool IsValidSegment(int ID) const { return ID > 0 && ID < ControlPoints.Num(); }
+	bool IsValidSegment(int ID) const { return ID > 0 && ID < (ControlPoints.Num() - 2); }
 
 };
 

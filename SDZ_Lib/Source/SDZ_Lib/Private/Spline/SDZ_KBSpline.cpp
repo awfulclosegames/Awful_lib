@@ -29,6 +29,20 @@ int USDZ_KBSpline::AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point)
 	return Segment;
 }
 
+void USDZ_KBSpline::RemoveLastSplinePoint(UKBSplineConfig* Config)
+{
+	if (!Config->ControlPoints.IsEmpty())
+	{
+		Config->ControlPoints.RemoveAtSwap(Config->ControlPoints.Num() - 1);
+	}
+}
+
+void USDZ_KBSpline::Reset(UKBSplineConfig* Config)
+{
+	Config->ControlPoints.Empty();
+	Config->SegmentBounds.Empty();
+}
+
 void USDZ_KBSpline::AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds Bound, int SegmentID)
 {
 	if (IsValid(Config))

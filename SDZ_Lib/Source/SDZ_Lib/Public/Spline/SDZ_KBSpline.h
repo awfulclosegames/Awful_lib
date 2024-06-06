@@ -21,6 +21,11 @@ public:
 	static int AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point);
 
 	UFUNCTION(BlueprintCallable)
+	static void RemoveLastSplinePoint(UKBSplineConfig* Config);
+
+	static void Reset(UKBSplineConfig* Config);
+
+	UFUNCTION(BlueprintCallable)
 	static void AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds Bound, int SegmentID);
 
 	UFUNCTION(BlueprintCallable)

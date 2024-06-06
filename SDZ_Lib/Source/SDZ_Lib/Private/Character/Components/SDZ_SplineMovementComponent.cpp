@@ -6,11 +6,13 @@
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
 
+#include "Spline/SDZ_KBSpline.h"
+
 #include "Character/SPlineTestCharacter.h"
 //#include "Character/Controlers/AV_PlayerController.h"
 //#include "Character/AviothicCharacter.h"
 
-
+#pragma optimize("",off)
 
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
@@ -23,10 +25,12 @@ void USDZ_SplineMovementComponent::BeginPlay()
     m_Character = Cast<ASplineTestCharacter>(GetOwner());
     ensure(IsValid(m_Character));
 
-    if (!CVarSDZ_SplineMoveDebug.GetValueOnGameThread())
-    {
-
-    }
+    m_SplineConfig = USDZ_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse));
+    
+    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() });
+    //USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) });
+    m_SplineState.CurrentTraversalSegment = 0;
+    m_currentSplineTime = MovementResponse;
 }
 
 void USDZ_SplineMovementComponent::PhysWalking(float deltaTime, int32 Iterations)
@@ -35,6 +39,93 @@ void USDZ_SplineMovementComponent::PhysWalking(float deltaTime, int32 Iterations
     Super::PhysWalking(deltaTime, Iterations);
 }
 
+void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds)
+{
+    FVector input = InputVector.GetClampedToMaxSize(1.0f);
+    const float RequestedSpeedSquared = input.SizeSquared();
+    if (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER)
+    {
+        FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
+        FVector MovementResponseTarget = input * GetMaxSpeed() * MovementResponse;
+
+        if (m_SplineWalk)
+        {
+            if (m_currentSplineTime >= MovementResponse )
+            {
+
+                m_ValidSpline = false;
+
+                int proposedSegment = m_SplineState.CurrentTraversalSegment + 1;
+                if (m_SplineConfig->IsValidSegment(proposedSegment))
+                {
+                    m_HalftiimeUpdateNeeded = true;
+                    m_currentSplineTime = 0.0f;
+                    m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
+                    m_ValidSpline = true;
+                }
+                else
+                {
+                    input.Z = 0.0f;
+                    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (input * GetMaxSpeed() * MovementResponse) });
+                    DrawDebugLine(GetWorld(), m_Character->GetActorLocation(), m_Character->GetActorLocation() + (input * GetMaxSpeed() * MovementResponse), FColor::Orange, false, 2.0f);
+
+                }
+            }
+            else if (m_HalftiimeUpdateNeeded && (m_currentSplineTime >= MovementResponse * 0.5f))
+            {
+                input.Z = 0.0f;
+
+                m_HalftiimeUpdateNeeded = false;
+                USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (input * GetMaxSpeed() * MovementResponse) });
+            }
+
+
+            if (m_ValidSpline)
+            {
+                m_SplineState.Time = m_currentSplineTime / MovementResponse;
+                m_currentSplineTime += DeltaSeconds;
+                input = (USDZ_KBSpline::Sample(m_SplineState) - m_Character->GetActorLocation()) / (GetMaxSpeed() * DeltaSeconds);
+            }
+        }
+
+#if !UE_BUILD_SHIPPING
+        if (CVarSDZ_SplineMoveDebug.GetValueOnAnyThread())
+        {
+            RequestedTarget.Z = 0.0f;
+            MovementResponseTarget.Z = 0.0f;
+            DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + RequestedTarget, 5.0f, 8, FColor::Black, false);
+            DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + MovementResponseTarget, 5.0f, 8, FColor::Orange, false);
+            if (m_SplineWalk && m_ValidSpline)
+            {
+                USDZ_KBSpline::DrawDebug(m_Character, m_SplineConfig, m_SplineState, FColor::Blue, 1.0f);
+            }
+
+        }
+#endif
+    }
+    //else
+    //{
+    //    m_currentSplineTime = MovementResponse;
+    //    m_ValidSpline = false;
+
+    //    USDZ_KBSpline::Reset(m_SplineConfig);
+    //    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) });
+    //    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() });
+    //}
+
+
+    Super::ControlledCharacterMove(input, DeltaSeconds);
+}
+
+void USDZ_SplineMovementComponent::SetUseSpline(bool Value)
+{
+    bool prevValue = m_SplineWalk;
+    m_SplineWalk = Value;
+    if (m_SplineWalk && !prevValue)
+    {
+        m_currentSplineTime = MovementResponse;
+    }
+}
 
 void USDZ_SplineMovementComponent::SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode)
 {
