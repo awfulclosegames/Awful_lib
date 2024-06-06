@@ -14,6 +14,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
+static TAutoConsoleVariable<bool> CVarSDZ_SplineMoveDebug(TEXT("sdz.SplineMovement.Debug"), false, TEXT("Enable/Disable debug visualization for the Point of interest system"));
 
 
 void USDZ_SplineMovementComponent::BeginPlay()
@@ -22,12 +23,22 @@ void USDZ_SplineMovementComponent::BeginPlay()
     m_Character = Cast<ASplineTestCharacter>(GetOwner());
     ensure(IsValid(m_Character));
 
+    if (!CVarSDZ_SplineMoveDebug.GetValueOnGameThread())
+    {
+
+    }
+}
+
+void USDZ_SplineMovementComponent::PhysWalking(float deltaTime, int32 Iterations)
+{
+
+    Super::PhysWalking(deltaTime, Iterations);
 }
 
 
 void USDZ_SplineMovementComponent::SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode)
 {
-    bool IsAvFlight = NewMovementMode == EMovementMode::MOVE_Custom;
+    //bool IsAvFlight = NewMovementMode == EMovementMode::MOVE_Custom;
 
     Super::SetMovementMode(NewMovementMode, NewCustomMode);
     bOrientRotationToMovement = true;

@@ -13,9 +13,8 @@
 
 
 //////////////////////////////////////////////////////////////////////////
-// AAviothicCharacter
+// ASplineTestCharacter
 
-//AAviothicCharacter::AAviothicCharacter()
 ASplineTestCharacter::ASplineTestCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<USDZ_SplineMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
@@ -96,6 +95,8 @@ void ASplineTestCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 		//Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ASplineTestCharacter::Look);
 
+		EnhancedInputComponent->BindAction(SwitchMode, ETriggerEvent::Triggered, this, &ASplineTestCharacter::SwapMode);
+
 	}
 
 }
@@ -170,7 +171,19 @@ void ASplineTestCharacter::Look(const FInputActionValue& Value)
 }
 
 
-
+void ASplineTestCharacter::SwapMode()
+{
+	GetCharacterMovement()->SplineWalk = !GetCharacterMovement()->SplineWalk;
+	//m_NormalWalk = !m_NormalWalk;
+	//if (m_NormalWalk)
+	//{
+	//	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
+	//}
+	//else
+	//{
+	//	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Custom);
+	//}
+}
 
 void ASplineTestCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {

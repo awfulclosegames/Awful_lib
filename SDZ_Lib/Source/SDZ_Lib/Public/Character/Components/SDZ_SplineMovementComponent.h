@@ -20,6 +20,8 @@ class SDZ_LIB_API USDZ_SplineMovementComponent : public UCharacterMovementCompon
 	GENERATED_BODY()
 public:
 
+	UPROPERTY(EditAnywhere)
+	bool SplineWalk = false;
 	
 	virtual void SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode = 0) override;
 
@@ -27,7 +29,7 @@ public:
 
 	virtual void BeginPlay() override;
 
-
+	virtual void PhysWalking(float deltaTime, int32 Iterations) override;
 private:
 
 	void HandleHitSomethign(const FVector& adjustedVel, FVector& location, FHitResult& hit, float deltaTime);
