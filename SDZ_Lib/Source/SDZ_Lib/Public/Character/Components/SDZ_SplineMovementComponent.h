@@ -44,6 +44,8 @@ public:
 private:
 
 	void HandleHitSomethign(const FVector& adjustedVel, FVector& location, FHitResult& hit, float deltaTime);
+	void UpdateSplineDirection(float DeltaT, FVector& outInput);
+
 
 	TObjectPtr<ASplineTestCharacter> m_Character;
 

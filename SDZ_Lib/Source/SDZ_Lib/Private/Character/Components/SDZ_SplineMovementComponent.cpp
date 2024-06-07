@@ -52,56 +52,25 @@ void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputV
 
         if (m_SplineWalk)
         {
-            m_MoveTarget += input * 3.0f* GetMaxSpeed() * DeltaSeconds;
-            FVector DeltaTarget = m_MoveTarget - m_Character->GetActorLocation();
-            float sqrLength = DeltaTarget.SquaredLength();
-            if (sqrLength > FMath::Square(GetMaxSpeed() * ControlLookahead))
-            {
-                DeltaTarget = DeltaTarget / FMath::Sqrt(sqrLength);
-                DeltaTarget *= GetMaxSpeed() * ControlLookahead;
-                m_MoveTarget = m_Character->GetActorLocation() + DeltaTarget;
-            }
-
-            input = (DeltaTarget / (GetMaxSpeed() * ControlLookahead)).GetClampedToMaxSize(1.0f);
-            RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
-            MovementResponseTarget = input * GetMaxSpeed() * MovementResponse;
-
-            if (m_currentSplineTime >= MovementResponse * 0.5f )
-            {
-
-                m_ValidSpline = false;
-
-                int proposedSegment = m_SplineState.CurrentTraversalSegment + 1;
-                if (m_SplineConfig->IsValidSegment(proposedSegment))
-                {
-                    m_HalftiimeUpdateNeeded = true;
-                    m_currentSplineTime = 0.0f;
-                    m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
-                    m_ValidSpline = true;
-                }
-                else
-                {
-                    input.Z = 0.0f;
-                    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (input * GetMaxSpeed() * MovementResponse) });
-                    DrawDebugLine(GetWorld(), m_Character->GetActorLocation(), m_Character->GetActorLocation() + (input * GetMaxSpeed() * MovementResponse), FColor::Orange, false, 2.0f);
-
-                }
-            }
-            //else if (m_HalftiimeUpdateNeeded && (m_currentSplineTime >= MovementResponse * 0.5f))
+            //m_MoveTarget += input * 4.0f * GetMaxSpeed() * DeltaSeconds;
+            //FVector DeltaTarget = m_MoveTarget - m_Character->GetActorLocation();
+            //float sqrLength = DeltaTarget.SquaredLength();
+            //if (sqrLength > FMath::Square(GetMaxSpeed() * ControlLookahead))
             //{
-            //    input.Z = 0.0f;
-
-            //    m_HalftiimeUpdateNeeded = false;
-            //    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (input * GetMaxSpeed() * MovementResponse) });
+            //    DeltaTarget = DeltaTarget / FMath::Sqrt(sqrLength);
+            //    DeltaTarget *= GetMaxSpeed() * ControlLookahead;
+            //    m_MoveTarget = m_Character->GetActorLocation() + DeltaTarget;
             //}
 
+            //FVector DrivenInput = (DeltaTarget / (GetMaxSpeed() * ControlLookahead)).GetClampedToMaxSize(1.0f);
+            //UE_LOG(LogSplineMovement, Log, TEXT(">>           INPUT: %f  DrivenInput : %f   "), input.Length(), DrivenInput.Length());
 
-            if (m_ValidSpline)
-            {
-                m_SplineState.Time = m_currentSplineTime / MovementResponse;
-                m_currentSplineTime += DeltaSeconds;
-                input = (USDZ_KBSpline::Sample(m_SplineState) - m_Character->GetActorLocation()) / (GetMaxSpeed() * DeltaSeconds);
-            }
+            //FVector AdjustedRequestedTarget = DrivenInput * GetMaxSpeed() * ControlLookahead;
+            //MovementResponseTarget = DrivenInput * GetMaxSpeed() * MovementResponse;
+            //DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + AdjustedRequestedTarget, 10.0f, 8, FColor::Blue, false);
+
+            UpdateSplineDirection(DeltaSeconds, input);
+            //input = DrivenInput;
         }
 
 #if !UE_BUILD_SHIPPING
@@ -132,6 +101,73 @@ void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputV
 
     Super::ControlledCharacterMove(input, DeltaSeconds);
 }
+
+
+void USDZ_SplineMovementComponent::UpdateSplineDirection(float DeltaT, FVector& outInput)
+{
+    //m_MoveTarget += outInput * 3.0f * GetMaxSpeed() * DeltaT;
+    //FVector DeltaTarget = m_MoveTarget - m_Character->GetActorLocation();
+    //float sqrLength = DeltaTarget.SquaredLength();
+    //if (sqrLength > FMath::Square(GetMaxSpeed() * ControlLookahead))
+    //{
+    //    DeltaTarget = DeltaTarget / FMath::Sqrt(sqrLength);
+    //    DeltaTarget *= GetMaxSpeed() * ControlLookahead;
+    //    m_MoveTarget = m_Character->GetActorLocation() + DeltaTarget;
+    //}
+
+    FVector DrivenInput = outInput;
+    //FVector DrivenInput = (DeltaTarget / (GetMaxSpeed() * ControlLookahead)).GetClampedToMaxSize(1.0f);
+
+    float targetTime = MovementResponse ;
+    float remainingSplineTime = m_currentSplineTime / targetTime;
+    m_ValidSpline = remainingSplineTime < 1.0f;
+    for (int i = 0; (i < 4) && !m_ValidSpline; ++i)
+    {
+        //if (remainingSplineTime > 1.0f)
+        {
+            //m_ValidSpline = false;
+            UE_LOG(LogSplineMovement, Log, TEXT(">>           Time > 1  remaining : %f   "), remainingSplineTime);
+
+            int proposedSegment = m_SplineState.CurrentTraversalSegment + 1;
+            if (m_SplineConfig->IsValidSegment(proposedSegment))
+            {
+                remainingSplineTime = FMath::Max(0.0f, remainingSplineTime - 1.0f);
+
+                m_currentSplineTime = remainingSplineTime;
+
+                m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
+                m_ValidSpline = remainingSplineTime < 1.0f;
+            }
+            else
+            {
+                UE_LOG(LogSplineMovement, Log, TEXT(">>           Adding POINT  OFFSET : I: %f  S: %f  T: %f (%f) "), DrivenInput , GetMaxSpeed() , targetTime, (DrivenInput * GetMaxSpeed() * targetTime));
+                DrivenInput.Z = 0.0f;
+                m_MoveTarget += DrivenInput * GetMaxSpeed() * targetTime;
+
+                USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_MoveTarget , -0.5f, 0.5f});
+                DrawDebugLine(GetWorld(), m_Character->GetActorLocation(), m_MoveTarget, FColor::Orange, false, 2.0f);
+  
+                DrawDebugSphere(GetWorld(), m_MoveTarget, 10.0f, 8, FColor::Orange, false);
+                DrawDebugSphere(GetWorld(), m_MoveTarget- DrivenInput * GetMaxSpeed() * targetTime, 10.0f, 8, FColor::Purple, false);
+
+            }
+        }
+    }
+    if (m_ValidSpline)
+    {
+        FVector OriginalInput = outInput;
+        m_SplineState.Time = remainingSplineTime;
+        outInput = (USDZ_KBSpline::Sample(m_SplineState) - m_Character->GetActorLocation()) / (GetMaxSpeed() * DeltaT);
+
+        UE_LOG(LogSplineMovement, Log, TEXT(">>    Sample Time : %f      Deflection: %s   (%f :: D: %f  I: %f)   Updating: %f"),
+            remainingSplineTime, *outInput.ToString(), 
+            outInput.Length(), DrivenInput.Length(), OriginalInput.Length(), 
+            m_currentSplineTime + DeltaT);
+        UE_LOG(LogSplineMovement, Log, TEXT("***********************************************************"));
+    }
+    m_currentSplineTime += DeltaT;
+}
+
 
 void USDZ_SplineMovementComponent::SetUseSpline(bool Value)
 {

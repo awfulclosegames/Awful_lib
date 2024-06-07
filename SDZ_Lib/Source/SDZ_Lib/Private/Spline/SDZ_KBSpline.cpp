@@ -97,18 +97,18 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 #if !UE_BUILD_SHIPPING
 	if (!CVarSDZ_SplineDebug.GetValueOnGameThread())
 		return;
+
 	if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
 	{
 		const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
 		int CPIdx = State.CurrentTraversalSegment - 1;
-		FVector prevPoint = Config->ControlPoints[CPIdx].Location;
-		for (int pointNum = 0; pointNum < 4; ++pointNum)
-		{
-			FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
-			DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 10.0f);
-			prevPoint = Point;
-
-		}
+		//FVector prevPoint = Config->ControlPoints[CPIdx].Location;
+		//for (int pointNum = 0; pointNum < 4; ++pointNum)
+		//{
+		//	FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
+		//	DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 10.0f);
+		//	prevPoint = Point;
+		//}
 
 
 		float step = 0.01f;

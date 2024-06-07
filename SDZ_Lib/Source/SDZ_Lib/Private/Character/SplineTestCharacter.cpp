@@ -59,7 +59,7 @@ void ASplineTestCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 3600.0f, 0.0f); // ...at this rotation rate
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 1800.0f, 0.0f); // ...at this rotation rate
 
 	//Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
