@@ -51,6 +51,8 @@ private:
 	UKBSplineConfig* m_SplineConfig;
 	FKBSplineState m_SplineState;
 
+	FVector m_MoveTarget;
+
 	float m_currentSplineTime = -1.0f;
 	bool m_SplineWalk = false;
 	bool m_ValidSpline = false;

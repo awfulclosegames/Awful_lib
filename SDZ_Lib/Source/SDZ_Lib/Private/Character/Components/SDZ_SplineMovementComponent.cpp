@@ -31,6 +31,8 @@ void USDZ_SplineMovementComponent::BeginPlay()
     //USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) });
     m_SplineState.CurrentTraversalSegment = 0;
     m_currentSplineTime = MovementResponse;
+
+    m_MoveTarget = m_Character->GetActorLocation();
 }
 
 void USDZ_SplineMovementComponent::PhysWalking(float deltaTime, int32 Iterations)
@@ -50,7 +52,21 @@ void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputV
 
         if (m_SplineWalk)
         {
-            if (m_currentSplineTime >= MovementResponse )
+            m_MoveTarget += input * 3.0f* GetMaxSpeed() * DeltaSeconds;
+            FVector DeltaTarget = m_MoveTarget - m_Character->GetActorLocation();
+            float sqrLength = DeltaTarget.SquaredLength();
+            if (sqrLength > FMath::Square(GetMaxSpeed() * ControlLookahead))
+            {
+                DeltaTarget = DeltaTarget / FMath::Sqrt(sqrLength);
+                DeltaTarget *= GetMaxSpeed() * ControlLookahead;
+                m_MoveTarget = m_Character->GetActorLocation() + DeltaTarget;
+            }
+
+            input = (DeltaTarget / (GetMaxSpeed() * ControlLookahead)).GetClampedToMaxSize(1.0f);
+            RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
+            MovementResponseTarget = input * GetMaxSpeed() * MovementResponse;
+
+            if (m_currentSplineTime >= MovementResponse * 0.5f )
             {
 
                 m_ValidSpline = false;
@@ -71,13 +87,13 @@ void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputV
 
                 }
             }
-            else if (m_HalftiimeUpdateNeeded && (m_currentSplineTime >= MovementResponse * 0.5f))
-            {
-                input.Z = 0.0f;
+            //else if (m_HalftiimeUpdateNeeded && (m_currentSplineTime >= MovementResponse * 0.5f))
+            //{
+            //    input.Z = 0.0f;
 
-                m_HalftiimeUpdateNeeded = false;
-                USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (input * GetMaxSpeed() * MovementResponse) });
-            }
+            //    m_HalftiimeUpdateNeeded = false;
+            //    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (input * GetMaxSpeed() * MovementResponse) });
+            //}
 
 
             if (m_ValidSpline)

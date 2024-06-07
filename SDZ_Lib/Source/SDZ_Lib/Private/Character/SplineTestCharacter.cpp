@@ -28,6 +28,7 @@ ASplineTestCharacter::ASplineTestCharacter(const FObjectInitializer& ObjectIniti
 
 	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...	
+	//GetCharacterMovement()->RotationRate = FRotator(0.0f, 7200.0f, 0.0f); // ...at this rotation rate
 	//GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f); // ...at this rotation rate
 
 	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
@@ -58,6 +59,7 @@ void ASplineTestCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 3600.0f, 0.0f); // ...at this rotation rate
 
 	//Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
@@ -103,43 +105,60 @@ void ASplineTestCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 
 void ASplineTestCharacter::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
-	FVector2D MovementVector = Value.Get<FVector2D>();
+	const FVector2D inputMovement = Value.Get<FVector2D>();
+	const FRotator inputYaw(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
 
-	if (Controller != nullptr)
+	if (inputMovement.X != 0.0f)
 	{
-		//if (m_IsFlying)
-		//{
-		//	const FRotator Rotation = GetActorRotation();
-
-		//	AddMovementInput(Rotation.RotateVector(FVector::ForwardVector), MovementVector.Y);
-		//	//AddMovementInput(FVector::RightVector, MovementVector.X);
-		//	if (auto movement = Cast<UAV_CharacterMovementComponent>(GetMovementComponent()))
-		//	{
-		//		movement->FlightControlInput.Yaw = MovementVector.X;
-
-		//	}
-		//}
-		//else
-		{
-			// find out which way is forward
-			const FRotator Rotation = Controller->GetControlRotation();
-
-			//const FRotator YawRotation(0, Rotation.Yaw, 0);
-
-			FRotationMatrix rotMat(Rotation);
-
-			// get forward vector
-			const FVector ForwardDirection = rotMat.GetUnitAxis(EAxis::X);
-
-			// get right vector 
-			const FVector RightDirection = rotMat.GetUnitAxis(EAxis::Y);
-
-			// add movement 
-			AddMovementInput(ForwardDirection, MovementVector.Y);
-			AddMovementInput(RightDirection, MovementVector.X);
-		}
+		const FVector direction = inputYaw.RotateVector(FVector::RightVector);
+		AddMovementInput(direction, inputMovement.X);
 	}
+
+	if (inputMovement.Y != 0.0f)
+	{
+		const FVector direction = inputYaw.RotateVector(FVector::ForwardVector);
+		AddMovementInput(direction, inputMovement.Y);
+	}
+
+
+
+	// input is a Vector2D
+//	FVector2D MovementVector = Value.Get<FVector2D>();
+
+	//if (Controller != nullptr)
+	//{
+	//	//if (m_IsFlying)
+	//	//{
+	//	//	const FRotator Rotation = GetActorRotation();
+
+	//	//	AddMovementInput(Rotation.RotateVector(FVector::ForwardVector), MovementVector.Y);
+	//	//	//AddMovementInput(FVector::RightVector, MovementVector.X);
+	//	//	if (auto movement = Cast<UAV_CharacterMovementComponent>(GetMovementComponent()))
+	//	//	{
+	//	//		movement->FlightControlInput.Yaw = MovementVector.X;
+
+	//	//	}
+	//	//}
+	//	//else
+	//	{
+	//		// find out which way is forward
+	//		const FRotator Rotation = Controller->GetControlRotation();
+
+	//		//const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+	//		FRotationMatrix rotMat(Rotation);
+
+	//		// get forward vector
+	//		const FVector ForwardDirection = rotMat.GetUnitAxis(EAxis::X);
+
+	//		// get right vector 
+	//		const FVector RightDirection = rotMat.GetUnitAxis(EAxis::Y);
+
+	//		// add movement 
+	//		AddMovementInput(ForwardDirection, MovementVector.Y);
+	//		AddMovementInput(RightDirection, MovementVector.X);
+	//	}
+	//}
 
 }
 
