@@ -40,6 +40,10 @@ class ASplineTestCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* SwitchMode;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* UpBiasAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* DownBiasAction;
 
 public:
 	//ASplineTestCharacter();
@@ -58,7 +62,10 @@ protected:
 	void Look(const FInputActionValue& Value);
 
 	void SwapMode();
-			
+
+	void UpBias();
+	void DownBias();
+
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

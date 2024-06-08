@@ -29,6 +29,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float MovementResponse = 0.5f;
 
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	float MoveBias = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	float MoveTensioning = -1.0f;
+
 	virtual void SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode = 0) override;
 
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;

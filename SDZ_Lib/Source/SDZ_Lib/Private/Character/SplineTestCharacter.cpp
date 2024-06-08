@@ -59,7 +59,7 @@ void ASplineTestCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 1080.0f, 0.0f); // ...at this rotation rate
+	GetCharacterMovement()->RotationRate = FRotator(0.0f, 720.0f, 0.0f); // ...at this rotation rate
 
 	//Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
@@ -87,9 +87,6 @@ void ASplineTestCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
-		//Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		//Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ASplineTestCharacter::Move);
@@ -98,6 +95,10 @@ void ASplineTestCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ASplineTestCharacter::Look);
 
 		EnhancedInputComponent->BindAction(SwitchMode, ETriggerEvent::Triggered, this, &ASplineTestCharacter::SwapMode);
+
+
+		EnhancedInputComponent->BindAction(UpBiasAction, ETriggerEvent::Triggered, this, &ASplineTestCharacter::UpBias);
+		EnhancedInputComponent->BindAction(DownBiasAction, ETriggerEvent::Triggered, this, &ASplineTestCharacter::DownBias);
 
 	}
 
@@ -120,46 +121,6 @@ void ASplineTestCharacter::Move(const FInputActionValue& Value)
 		AddMovementInput(direction, inputMovement.Y);
 	}
 
-
-
-	// input is a Vector2D
-//	FVector2D MovementVector = Value.Get<FVector2D>();
-
-	//if (Controller != nullptr)
-	//{
-	//	//if (m_IsFlying)
-	//	//{
-	//	//	const FRotator Rotation = GetActorRotation();
-
-	//	//	AddMovementInput(Rotation.RotateVector(FVector::ForwardVector), MovementVector.Y);
-	//	//	//AddMovementInput(FVector::RightVector, MovementVector.X);
-	//	//	if (auto movement = Cast<UAV_CharacterMovementComponent>(GetMovementComponent()))
-	//	//	{
-	//	//		movement->FlightControlInput.Yaw = MovementVector.X;
-
-	//	//	}
-	//	//}
-	//	//else
-	//	{
-	//		// find out which way is forward
-	//		const FRotator Rotation = Controller->GetControlRotation();
-
-	//		//const FRotator YawRotation(0, Rotation.Yaw, 0);
-
-	//		FRotationMatrix rotMat(Rotation);
-
-	//		// get forward vector
-	//		const FVector ForwardDirection = rotMat.GetUnitAxis(EAxis::X);
-
-	//		// get right vector 
-	//		const FVector RightDirection = rotMat.GetUnitAxis(EAxis::Y);
-
-	//		// add movement 
-	//		AddMovementInput(ForwardDirection, MovementVector.Y);
-	//		AddMovementInput(RightDirection, MovementVector.X);
-	//	}
-	//}
-
 }
 
 void ASplineTestCharacter::Look(const FInputActionValue& Value)
@@ -169,23 +130,9 @@ void ASplineTestCharacter::Look(const FInputActionValue& Value)
 
 	if (Controller != nullptr)
 	{
-		//if (m_IsFlying)
-		//{
-		//	if (auto movement = Cast<UAV_CharacterMovementComponent>(GetMovementComponent()) )
-		//	{
-		//		movement->FlightControlInput.Roll = LookAxisVector.X;
-		//		movement->FlightControlInput.Pitch = LookAxisVector.Y;
-		//	}
-		//	//AddControllerRollInput(LookAxisVector.X);
-		//	//AddControllerPitchInput(LookAxisVector.Y);
-
-		//}
-		//else
-		{
-			// add yaw and pitch input to controller
-			AddControllerYawInput(LookAxisVector.X);
-			AddControllerPitchInput(LookAxisVector.Y);
-		}
+		// add yaw and pitch input to controller
+		AddControllerYawInput(LookAxisVector.X);
+		AddControllerPitchInput(LookAxisVector.Y);
 	}
 }
 
@@ -205,6 +152,22 @@ void ASplineTestCharacter::SwapMode()
 	//{
 	//	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Custom);
 	//}
+}
+void ASplineTestCharacter::UpBias()
+{
+	if (auto movement = Cast<USDZ_SplineMovementComponent>(GetCharacterMovement()))
+	{
+		movement->MoveBias = FMath::Min(1.0f, movement->MoveBias + 0.5f);
+	}
+}
+
+void ASplineTestCharacter::DownBias()
+{
+	if (auto movement = Cast<USDZ_SplineMovementComponent>(GetCharacterMovement()))
+	{
+		movement->MoveBias = FMath::Max(0.0f, movement->MoveBias - 0.5f);
+	}
+
 }
 
 void ASplineTestCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)

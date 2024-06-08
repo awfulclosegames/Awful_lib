@@ -112,7 +112,7 @@ void USDZ_SplineMovementComponent::UpdateSplineDirection(float DeltaT, FVector& 
             DrivenInput.Z = 0.0f;
             m_NextPointTarget += DrivenInput * GetMaxSpeed() * targetTime;
 
-            USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_NextPointTarget , -0.5f, 0.5f });
+            USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_NextPointTarget , MoveTensioning, MoveBias });
         }
     }
 
@@ -129,11 +129,11 @@ void USDZ_SplineMovementComponent::ResetSplineState()
 {
     USDZ_KBSpline::Reset(m_SplineConfig);
 
-    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_HalfRespRate) });
-    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() });
-    //USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) });
+    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_HalfRespRate) , MoveTensioning, MoveBias });
+    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation()  , MoveTensioning, MoveBias });
+
     m_SplineState.CurrentTraversalSegment = 0;
-    m_currentSplineTime = 1.0f;
+    m_currentSplineTime = 0.0f;
     m_SegmentVelHeur = 0.0f;
     m_CurrentSegLen = 1.0f;
     m_NextPointTarget = m_Character->GetActorLocation();

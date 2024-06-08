@@ -688,16 +688,19 @@ void KBSplineUtils::MatchSlopeAtEnd()
 
 void KBSplineUtils::ComputeAB(ParameterBlock& Block)
 {
+    constexpr float gamma_0 = 0.1f;
     /* gamma is the continuity param)*/
-    Block.A = 0.5 * (Block.Beta[0] + 1.0) * (-Block.Tau[0] + 1.0) /* * (1.0f + gamma_0)*/;
-    Block.B = 0.5 * (-Block.Beta[0] + 1.0) * (-Block.Tau[0] + 1.0) /* * (1.0f - gamma_0)*/;
+    Block.A = 0.5 * (Block.Beta[0] + 1.0) * (-Block.Tau[0] + 1.0)  * (1.0f + gamma_0);
+    Block.B = 0.5 * (-Block.Beta[0] + 1.0) * (-Block.Tau[0] + 1.0)  * (1.0f - gamma_0);
 }
 
 void KBSplineUtils::ComputeCD(ParameterBlock& Block)
 {
+    constexpr float gamma_1 = 0.1f;
+
     /* gamma is the continuity param)*/
-    Block.C = 0.5 * (Block.Beta[1] + 1.0) * (-Block.Tau[1] + 1.0) /* * (1.0f - gamma_1)*/;
-    Block.D = 0.5 * (-Block.Beta[1] + 1.0) * (-Block.Tau[1] + 1.0) /* * (1.0f + gamma_1)*/;
+    Block.C = 0.5 * (Block.Beta[1] + 1.0) * (-Block.Tau[1] + 1.0)  * (1.0f - gamma_1);
+    Block.D = 0.5 * (-Block.Beta[1] + 1.0) * (-Block.Tau[1] + 1.0)  * (1.0f + gamma_1);
 }
 
 FVector KBSplineUtils::Sample(const FVector Coeffs[4], float Time)
