@@ -26,6 +26,9 @@ public:
 	static void Reset(UKBSplineConfig* Config);
 
 	UFUNCTION(BlueprintCallable)
+	static void GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord);
+
+	UFUNCTION(BlueprintCallable)
 	static void AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds Bound, int SegmentID);
 
 	UFUNCTION(BlueprintCallable)

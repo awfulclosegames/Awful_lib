@@ -45,7 +45,7 @@ private:
 
 	void HandleHitSomethign(const FVector& adjustedVel, FVector& location, FHitResult& hit, float deltaTime);
 	void UpdateSplineDirection(float DeltaT, FVector& outInput);
-
+	void ResetSplineState();
 
 	TObjectPtr<ASplineTestCharacter> m_Character;
 
@@ -53,11 +53,17 @@ private:
 	UKBSplineConfig* m_SplineConfig;
 	FKBSplineState m_SplineState;
 
-	FVector m_MoveTarget;
+	FVector m_NextPointTarget;
+
+	FVector m_SegmentChordDir;
+
+	float m_HalfRespRate = 0.0f;
+
+	float m_CurrentSegLen = 1.0f;
+	float m_SegmentVelHeur = 0.0f;
 
 	float m_currentSplineTime = -1.0f;
 	bool m_SplineWalk = false;
 	bool m_ValidSpline = false;
-	bool m_HalftiimeUpdateNeeded = true;
 
 };

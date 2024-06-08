@@ -16,7 +16,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
-static TAutoConsoleVariable<bool> CVarSDZ_SplineMoveDebug(TEXT("sdz.SplineMovement.Debug"), false, TEXT("Enable/Disable debug visualization for the Point of interest system"));
+static TAutoConsoleVariable<bool> CVarSDZ_SplineMoveDebug(TEXT("sdz.SplineMovement.Debug"), true, TEXT("Enable/Disable debug visualization for the Point of interest system"));
 
 
 void USDZ_SplineMovementComponent::BeginPlay()
@@ -25,14 +25,9 @@ void USDZ_SplineMovementComponent::BeginPlay()
     m_Character = Cast<ASplineTestCharacter>(GetOwner());
     ensure(IsValid(m_Character));
 
-    m_SplineConfig = USDZ_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse));
-    
-    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() });
-    //USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) });
-    m_SplineState.CurrentTraversalSegment = 0;
-    m_currentSplineTime = MovementResponse;
-
-    m_MoveTarget = m_Character->GetActorLocation();
+    m_SplineConfig = USDZ_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_HalfRespRate));
+    m_HalfRespRate = MovementResponse;
+    ResetSplineState();
 }
 
 void USDZ_SplineMovementComponent::PhysWalking(float deltaTime, int32 Iterations)
@@ -52,25 +47,7 @@ void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputV
 
         if (m_SplineWalk)
         {
-            //m_MoveTarget += input * 4.0f * GetMaxSpeed() * DeltaSeconds;
-            //FVector DeltaTarget = m_MoveTarget - m_Character->GetActorLocation();
-            //float sqrLength = DeltaTarget.SquaredLength();
-            //if (sqrLength > FMath::Square(GetMaxSpeed() * ControlLookahead))
-            //{
-            //    DeltaTarget = DeltaTarget / FMath::Sqrt(sqrLength);
-            //    DeltaTarget *= GetMaxSpeed() * ControlLookahead;
-            //    m_MoveTarget = m_Character->GetActorLocation() + DeltaTarget;
-            //}
-
-            //FVector DrivenInput = (DeltaTarget / (GetMaxSpeed() * ControlLookahead)).GetClampedToMaxSize(1.0f);
-            //UE_LOG(LogSplineMovement, Log, TEXT(">>           INPUT: %f  DrivenInput : %f   "), input.Length(), DrivenInput.Length());
-
-            //FVector AdjustedRequestedTarget = DrivenInput * GetMaxSpeed() * ControlLookahead;
-            //MovementResponseTarget = DrivenInput * GetMaxSpeed() * MovementResponse;
-            //DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + AdjustedRequestedTarget, 10.0f, 8, FColor::Blue, false);
-
             UpdateSplineDirection(DeltaSeconds, input);
-            //input = DrivenInput;
         }
 
 #if !UE_BUILD_SHIPPING
@@ -84,19 +61,13 @@ void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputV
             {
                 USDZ_KBSpline::DrawDebug(m_Character, m_SplineConfig, m_SplineState, FColor::Blue, 1.0f);
             }
-
         }
 #endif
     }
-    //else
-    //{
-    //    m_currentSplineTime = MovementResponse;
-    //    m_ValidSpline = false;
-
-    //    USDZ_KBSpline::Reset(m_SplineConfig);
-    //    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) });
-    //    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() });
-    //}
+    else
+    {
+        ResetSplineState();
+    }
 
 
     Super::ControlledCharacterMove(input, DeltaSeconds);
@@ -105,69 +76,68 @@ void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputV
 
 void USDZ_SplineMovementComponent::UpdateSplineDirection(float DeltaT, FVector& outInput)
 {
-    //m_MoveTarget += outInput * 3.0f * GetMaxSpeed() * DeltaT;
-    //FVector DeltaTarget = m_MoveTarget - m_Character->GetActorLocation();
-    //float sqrLength = DeltaTarget.SquaredLength();
-    //if (sqrLength > FMath::Square(GetMaxSpeed() * ControlLookahead))
-    //{
-    //    DeltaTarget = DeltaTarget / FMath::Sqrt(sqrLength);
-    //    DeltaTarget *= GetMaxSpeed() * ControlLookahead;
-    //    m_MoveTarget = m_Character->GetActorLocation() + DeltaTarget;
-    //}
+    float quantumUpdate = DeltaT / m_HalfRespRate;
+    // project onto the spline segment chord, the character's expected movement. Clumsy! but functional for this demo
+    FVector expectedMovement = m_Character->GetActorForwardVector() * m_SegmentVelHeur * DeltaT;
+    m_currentSplineTime += FMath::Max(quantumUpdate,m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
 
     FVector DrivenInput = outInput;
-    //FVector DrivenInput = (DeltaTarget / (GetMaxSpeed() * ControlLookahead)).GetClampedToMaxSize(1.0f);
 
-    float targetTime = MovementResponse ;
-    float remainingSplineTime = m_currentSplineTime / targetTime;
-    m_ValidSpline = remainingSplineTime < 1.0f;
+    float targetTime = m_HalfRespRate;
+    m_ValidSpline = m_currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
+
     for (int i = 0; (i < 4) && !m_ValidSpline; ++i)
     {
-        //if (remainingSplineTime > 1.0f)
+        int proposedSegment = m_SplineState.CurrentTraversalSegment + 1;
+        if (m_SplineConfig->IsValidSegment(proposedSegment))
         {
-            //m_ValidSpline = false;
-            UE_LOG(LogSplineMovement, Log, TEXT(">>           Time > 1  remaining : %f   "), remainingSplineTime);
+            m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
 
-            int proposedSegment = m_SplineState.CurrentTraversalSegment + 1;
-            if (m_SplineConfig->IsValidSegment(proposedSegment))
+            USDZ_KBSpline::GetChord(m_SplineConfig, proposedSegment, m_SegmentChordDir);
+            m_CurrentSegLen = m_SegmentChordDir.Length();
+            if (m_CurrentSegLen > 0.0f)
             {
-                remainingSplineTime = FMath::Max(0.0f, remainingSplineTime - 1.0f);
-
-                m_currentSplineTime = remainingSplineTime;
-
-                m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
-                m_ValidSpline = remainingSplineTime < 1.0f;
+                m_SegmentChordDir /= m_CurrentSegLen;
             }
-            else
-            {
-                UE_LOG(LogSplineMovement, Log, TEXT(">>           Adding POINT  OFFSET : I: %f  S: %f  T: %f (%f) "), DrivenInput , GetMaxSpeed() , targetTime, (DrivenInput * GetMaxSpeed() * targetTime));
-                DrivenInput.Z = 0.0f;
-                m_MoveTarget += DrivenInput * GetMaxSpeed() * targetTime;
+            
+            m_SegmentVelHeur = m_CurrentSegLen / targetTime;
+            
+            expectedMovement = m_Character->GetActorForwardVector() * m_SegmentVelHeur * DeltaT;
 
-                USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_MoveTarget , -0.5f, 0.5f});
-                DrawDebugLine(GetWorld(), m_Character->GetActorLocation(), m_MoveTarget, FColor::Orange, false, 2.0f);
-  
-                DrawDebugSphere(GetWorld(), m_MoveTarget, 10.0f, 8, FColor::Orange, false);
-                DrawDebugSphere(GetWorld(), m_MoveTarget- DrivenInput * GetMaxSpeed() * targetTime, 10.0f, 8, FColor::Purple, false);
+            m_currentSplineTime = FMath::Max(quantumUpdate, m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
+            m_ValidSpline = m_currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
+        }
+        else
+        {
+            DrivenInput.Z = 0.0f;
+            m_NextPointTarget += DrivenInput * GetMaxSpeed() * targetTime;
 
-            }
+            USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_NextPointTarget , -0.5f, 0.5f });
         }
     }
+
     if (m_ValidSpline)
     {
         FVector OriginalInput = outInput;
-        m_SplineState.Time = remainingSplineTime;
-        outInput = (USDZ_KBSpline::Sample(m_SplineState) - m_Character->GetActorLocation()) / (GetMaxSpeed() * DeltaT);
-
-        UE_LOG(LogSplineMovement, Log, TEXT(">>    Sample Time : %f      Deflection: %s   (%f :: D: %f  I: %f)   Updating: %f"),
-            remainingSplineTime, *outInput.ToString(), 
-            outInput.Length(), DrivenInput.Length(), OriginalInput.Length(), 
-            m_currentSplineTime + DeltaT);
-        UE_LOG(LogSplineMovement, Log, TEXT("***********************************************************"));
+        m_SplineState.Time = m_currentSplineTime;
+        FVector splinePoint = USDZ_KBSpline::Sample(m_SplineState);
+        outInput = (splinePoint - m_Character->GetActorLocation()) / (GetMaxSpeed() * DeltaT);
     }
-    m_currentSplineTime += DeltaT;
 }
 
+void USDZ_SplineMovementComponent::ResetSplineState()
+{
+    USDZ_KBSpline::Reset(m_SplineConfig);
+
+    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_HalfRespRate) });
+    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() });
+    //USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() + (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) });
+    m_SplineState.CurrentTraversalSegment = 0;
+    m_currentSplineTime = 1.0f;
+    m_SegmentVelHeur = 0.0f;
+    m_CurrentSegLen = 1.0f;
+    m_NextPointTarget = m_Character->GetActorLocation();
+}
 
 void USDZ_SplineMovementComponent::SetUseSpline(bool Value)
 {
@@ -175,7 +145,7 @@ void USDZ_SplineMovementComponent::SetUseSpline(bool Value)
     m_SplineWalk = Value;
     if (m_SplineWalk && !prevValue)
     {
-        m_currentSplineTime = MovementResponse;
+        ResetSplineState();
     }
 }
 
@@ -194,9 +164,7 @@ void USDZ_SplineMovementComponent::SetMovementMode(EMovementMode NewMovementMode
     if (IsValid(m_Character))
     {
         //m_Character->SetAVFlightBehaviour(IsAvFlight);
-    }
-
-
+    }    
 }
 
 FRotator operator*(const FRotator& A, const FRotator& B)
@@ -208,74 +176,74 @@ void USDZ_SplineMovementComponent::PhysCustom(float deltaTime, int32 Iterations)
 {
 	Super::PhysCustom(deltaTime, Iterations);
 
-    if (deltaTime < MIN_TICK_TIME)
-    {
-        return;
-    }
-    bool validCharacter = CharacterOwner && (CharacterOwner->Controller || bRunPhysicsWithNoController || HasAnimRootMotion() || CurrentRootMotion.HasOverrideVelocity() || (CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy));
-    if (!validCharacter)
-    {
-        return;
-    }
+    //if (deltaTime < MIN_TICK_TIME)
+    //{
+    //    return;
+    //}
+    //bool validCharacter = CharacterOwner && (CharacterOwner->Controller || bRunPhysicsWithNoController || HasAnimRootMotion() || CurrentRootMotion.HasOverrideVelocity() || (CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy));
+    //if (!validCharacter)
+    //{
+    //    return;
+    //}
 
-    
-    auto controlRotation = CharacterOwner->Controller->GetControlRotation();
+    //
+    //auto controlRotation = CharacterOwner->Controller->GetControlRotation();
 
-    bJustTeleported = false;
-    float remainingTime = deltaTime;
-    const FVector gravity(0.f, 0.f, GetGravityZ());
-    FVector angularAccel(0.0f);
+    //bJustTeleported = false;
+    //float remainingTime = deltaTime;
+    //const FVector gravity(0.f, 0.f, GetGravityZ());
+    //FVector angularAccel(0.0f);
 
-    RestorePreAdditiveRootMotionVelocity();
+    //RestorePreAdditiveRootMotionVelocity();
 
-    // Update movement state
-    while ((remainingTime >= MIN_TICK_TIME) && (Iterations < MaxSimulationIterations))
-    {
+    //// Update movement state
+    //while ((remainingTime >= MIN_TICK_TIME) && (Iterations < MaxSimulationIterations))
+    //{
 
-        Iterations++;
-        bJustTeleported = false;
-        const float timeTick = GetSimulationTimeStep(remainingTime, Iterations);
-        remainingTime -= timeTick;
+    //    Iterations++;
+    //    bJustTeleported = false;
+    //    const float timeTick = GetSimulationTimeStep(remainingTime, Iterations);
+    //    remainingTime -= timeTick;
 
-        if (!HasAnimRootMotion() && !CurrentRootMotion.HasOverrideVelocity())
-        {
-            const float prevVerticalVel = Velocity.Z;
+    //    if (!HasAnimRootMotion() && !CurrentRootMotion.HasOverrideVelocity())
+    //    {
+    //        const float prevVerticalVel = Velocity.Z;
 
-            CalcVelocity(timeTick, 0, false, 0);
-        }
-
-
-        FVector velDir = Velocity;
-        float speed = Velocity.SquaredLength();
-        if (speed > 0.0f)
-        {
-            speed = FMath::Sqrt(speed);
-            velDir /= speed;
-        }
-        FVector localVelDir = CharacterOwner->GetActorQuat().UnrotateVector(velDir);
+    //        CalcVelocity(timeTick, 0, false, 0);
+    //    }
 
 
+    //    FVector velDir = Velocity;
+    //    float speed = Velocity.SquaredLength();
+    //    if (speed > 0.0f)
+    //    {
+    //        speed = FMath::Sqrt(speed);
+    //        velDir /= speed;
+    //    }
+    //    FVector localVelDir = CharacterOwner->GetActorQuat().UnrotateVector(velDir);
 
-        // Apply gravity 
-        Velocity = NewFallVelocity(Velocity, gravity, timeTick);
 
 
-        ApplyRootMotionToVelocity(timeTick);
+    //    // Apply gravity 
+    //    Velocity = NewFallVelocity(Velocity, gravity, timeTick);
 
-        FVector oldLocation = UpdatedComponent->GetComponentLocation();
 
-        const FVector adjusted = Velocity * timeTick;
-        FHitResult hit(1.f);
-        SafeMoveUpdatedComponent(adjusted, UpdatedComponent->GetComponentQuat(), true, hit);
+    //    ApplyRootMotionToVelocity(timeTick);
 
-        HandleHitSomethign(adjusted, oldLocation, hit, timeTick);
+    //    FVector oldLocation = UpdatedComponent->GetComponentLocation();
 
-        if (!bJustTeleported && !HasAnimRootMotion() && !CurrentRootMotion.HasOverrideVelocity())
-        {
-            Velocity = (UpdatedComponent->GetComponentLocation() - oldLocation) / timeTick;
-        }
-        
-    }
+    //    const FVector adjusted = Velocity * timeTick;
+    //    FHitResult hit(1.f);
+    //    SafeMoveUpdatedComponent(adjusted, UpdatedComponent->GetComponentQuat(), true, hit);
+
+    //    HandleHitSomethign(adjusted, oldLocation, hit, timeTick);
+
+    //    if (!bJustTeleported && !HasAnimRootMotion() && !CurrentRootMotion.HasOverrideVelocity())
+    //    {
+    //        Velocity = (UpdatedComponent->GetComponentLocation() - oldLocation) / timeTick;
+    //    }
+    //    
+    //}
 
 
     //m_Character->AddActorLocalRotation(inducedQRot);

@@ -4,7 +4,7 @@
 #include "Spline/SDZ_KBSpline.h"
 #include "Spline/KBSpline_Utilis.h"
 
-static TAutoConsoleVariable<bool> CVarSDZ_SplineDebug(TEXT("sdz.Spline.Debug"), false, TEXT("Enable/Disable debug visualization for the KB Spline"));
+static TAutoConsoleVariable<bool> CVarSDZ_SplineDebug(TEXT("sdz.Spline.Debug"), true, TEXT("Enable/Disable debug visualization for the KB Spline"));
 
 UKBSplineConfig* USDZ_KBSpline::CreateSplineConfig(FVector Location)
 {
@@ -41,6 +41,17 @@ void USDZ_KBSpline::Reset(UKBSplineConfig* Config)
 {
 	Config->ControlPoints.Empty();
 	Config->SegmentBounds.Empty();
+}
+
+void USDZ_KBSpline::GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord)
+{
+	if (IsValid(Config))
+	{
+		if(Config->IsValidSegment(SegmentID))
+		{
+			outChord = Config->ControlPoints[SegmentID + 1].Location - Config->ControlPoints[SegmentID].Location;
+		}
+	}
 }
 
 void USDZ_KBSpline::AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds Bound, int SegmentID)
