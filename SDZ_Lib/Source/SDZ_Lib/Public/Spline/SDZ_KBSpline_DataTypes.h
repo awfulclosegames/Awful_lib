@@ -16,9 +16,9 @@ struct FKBSplinePoint
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector Location = { 0.0f, 0.0f, 0.0f };
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Tau = 0.0f;
+	float Tau = -1.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Beta = 0.5f;
+	float Beta = 0.0f;
 };
 
 USTRUCT(BlueprintType)

@@ -99,6 +99,9 @@ void ASplineTestCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 
 		EnhancedInputComponent->BindAction(UpBiasAction, ETriggerEvent::Triggered, this, &ASplineTestCharacter::UpBias);
 		EnhancedInputComponent->BindAction(DownBiasAction, ETriggerEvent::Triggered, this, &ASplineTestCharacter::DownBias);
+		
+		EnhancedInputComponent->BindAction(UpResponseAction, ETriggerEvent::Triggered, this, &ASplineTestCharacter::UpResp);
+		EnhancedInputComponent->BindAction(DownResponseAction, ETriggerEvent::Triggered, this, &ASplineTestCharacter::DownResp);
 
 	}
 
@@ -165,10 +168,28 @@ void ASplineTestCharacter::DownBias()
 {
 	if (auto movement = Cast<USDZ_SplineMovementComponent>(GetCharacterMovement()))
 	{
-		movement->MoveBias = FMath::Max(0.0f, movement->MoveBias - 0.5f);
+		movement->MoveBias = FMath::Max(-1.0f, movement->MoveBias - 0.5f);
 	}
 
 }
+
+void ASplineTestCharacter::UpResp()
+{
+	if (auto movement = Cast<USDZ_SplineMovementComponent>(GetCharacterMovement()))
+	{
+		movement->IncreaseResponse();
+	}
+}
+
+void ASplineTestCharacter::DownResp()
+{
+	if (auto movement = Cast<USDZ_SplineMovementComponent>(GetCharacterMovement()))
+	{
+		movement->DecreaseResponse();
+	}
+
+}
+
 
 void ASplineTestCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {

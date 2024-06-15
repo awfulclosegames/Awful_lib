@@ -47,6 +47,10 @@ public:
 
 	void SetUseSpline(bool Value);
 	bool GetUseSpline()const { return m_SplineWalk; }
+
+	void IncreaseResponse();
+	void DecreaseResponse();
+
 private:
 
 	void HandleHitSomethign(const FVector& adjustedVel, FVector& location, FHitResult& hit, float deltaTime);

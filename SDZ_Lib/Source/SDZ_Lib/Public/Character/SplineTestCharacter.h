@@ -45,6 +45,12 @@ class ASplineTestCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* DownBiasAction;
 
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* UpResponseAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* DownResponseAction;
+
 public:
 	//ASplineTestCharacter();
 	//ASplineTestCharacter::ASplineTestCharacter(const FObjectInitializer& ObjectInitializer);
@@ -65,6 +71,8 @@ protected:
 
 	void UpBias();
 	void DownBias();
+	void UpResp();
+	void DownResp();
 
 protected:
 	// APawn interface

@@ -12,7 +12,6 @@
 //#include "Character/Controlers/AV_PlayerController.h"
 //#include "Character/AviothicCharacter.h"
 
-#pragma optimize("",off)
 
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
@@ -26,9 +25,23 @@ void USDZ_SplineMovementComponent::BeginPlay()
     ensure(IsValid(m_Character));
 
     m_SplineConfig = USDZ_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_HalfRespRate));
-    m_HalfRespRate = MovementResponse;
+    m_HalfRespRate = MovementResponse * 0.5f;
     ResetSplineState();
 }
+
+void USDZ_SplineMovementComponent::DecreaseResponse()
+{
+    MovementResponse *= 0.75f;
+    m_HalfRespRate = MovementResponse * 0.5f;
+
+}
+void USDZ_SplineMovementComponent::IncreaseResponse()
+{
+    MovementResponse /= 0.75f;
+
+    m_HalfRespRate = MovementResponse * 0.5f;
+}
+
 
 void USDZ_SplineMovementComponent::PhysWalking(float deltaTime, int32 Iterations)
 {
