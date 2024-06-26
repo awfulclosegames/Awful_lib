@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Containers/Queue.h"
 
 #include "SDZ_KBSpline_DataTypes.generated.h"
 
@@ -75,8 +76,7 @@ class UKBSplineConfig : public UObject
 {
 	GENERATED_BODY()
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<FKBSplinePoint> ControlPoints;
+	TQueue<FKBSplinePoint> ControlPoints;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<int, FKBSplineBounds> SegmentBounds;
@@ -88,7 +88,14 @@ public:
 
 	UKBSplineConfig(FVector Location);
 
-	bool IsValidSegment(int ID) const { return ID > 0 && ID < (ControlPoints.Num() - 2); }
+//	bool IsValidSegment(int ID) const { return ID >= RootSegment && (ID + RootSegment) < (ControlPoints.Num() - 2); }
 
+	void UpdateWorkingSet();
+	void Reset();
+private:
+	UPROPERTY()
+	TArray<FKBSplinePoint> WorkingSet;
+
+	int RootSegment = 0;
 };
 

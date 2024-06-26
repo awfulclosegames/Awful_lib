@@ -18,7 +18,7 @@ class SDZ_LIB_API USDZ_KBSpline : public UBlueprintFunctionLibrary
 public:
 
 	UFUNCTION(BlueprintCallable)
-	static int AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point);
+	static void AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point);
 
 	UFUNCTION(BlueprintCallable)
 	static void RemoveLastSplinePoint(UKBSplineConfig* Config);

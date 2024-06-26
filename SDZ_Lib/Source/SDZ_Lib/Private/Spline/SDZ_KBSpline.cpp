@@ -18,29 +18,25 @@ UKBSplineConfig* USDZ_KBSpline::CreateSplineConfig(FVector Location)
 	return nullptr;
 }
 
-int USDZ_KBSpline::AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point)
+void USDZ_KBSpline::AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point)
 {
-	int Segment = -1;
 	if (IsValid(Config))
 	{
-		Segment = Config->ControlPoints.Num();
-		Config->ControlPoints.Add(Point);
+		Config->ControlPoints.Enqueue(Point);
 	}
-	return Segment;
 }
 
-void USDZ_KBSpline::RemoveLastSplinePoint(UKBSplineConfig* Config)
-{
-	if (!Config->ControlPoints.IsEmpty())
-	{
-		Config->ControlPoints.RemoveAtSwap(Config->ControlPoints.Num() - 1);
-	}
-}
+//void USDZ_KBSpline::RemoveLastSplinePoint(UKBSplineConfig* Config)
+//{
+//	if (!Config->ControlPoints.IsEmpty())
+//	{
+//		Config->ControlPoints.RemoveAtSwap(Config->ControlPoints.Num() - 1);
+//	}
+//}
 
 void USDZ_KBSpline::Reset(UKBSplineConfig* Config)
 {
-	Config->ControlPoints.Empty();
-	Config->SegmentBounds.Empty();
+	Config->Reset();
 }
 
 void USDZ_KBSpline::GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord)
