@@ -177,7 +177,7 @@ void USDZ_KBSpline::DrawDebugConstraints(AActor* Actor, const UKBSplineConfig* C
 	//		for (float Time = 0.0f; Time <= 1.0f; Time += step)
 	//		{
 	//			FVector sample = KBSplineUtils::Sample(State.OriginalCoeffs, Time);
-	//			DrawDebugLine(Actor->GetWorld(), prev, sample, FColor::Orange, false, 1.0f);
+	//			DrawDebugLine(Actor->GetWorld(), prev, sample, FColor::Red, false, 1.0f, 0, 1.5f);
 	//			prev = sample;
 	//		}
 

@@ -692,7 +692,7 @@ void KBSplineUtils::MatchSlopeAtEnd()
 
 void KBSplineUtils::ComputeAB(ParameterBlock& Block)
 {
-    constexpr float gamma_0 = 0.1f;
+    constexpr float gamma_0 = 0.0f;
     /* gamma is the continuity param)*/
     Block.A = 0.5 * (Block.Beta[0] + 1.0) * (-Block.Tau[0] + 1.0)  * (1.0f + gamma_0);
     Block.B = 0.5 * (-Block.Beta[0] + 1.0) * (-Block.Tau[0] + 1.0)  * (1.0f - gamma_0);
@@ -700,7 +700,7 @@ void KBSplineUtils::ComputeAB(ParameterBlock& Block)
 
 void KBSplineUtils::ComputeCD(ParameterBlock& Block)
 {
-    constexpr float gamma_1 = 0.1f;
+    constexpr float gamma_1 = 0.0f;
 
     /* gamma is the continuity param)*/
     Block.C = 0.5 * (Block.Beta[1] + 1.0) * (-Block.Tau[1] + 1.0)  * (1.0f - gamma_1);
@@ -712,6 +712,7 @@ FVector KBSplineUtils::Sample(const FVector Coeffs[4], float Time)
     float tSq = Time * Time;
     float tQb = tSq * Time;
     return (Coeffs[0] * tQb) + (Coeffs[1] * tSq) + (Coeffs[2] * Time) + (Coeffs[3]);
+    // this seems right or else the matrix is reversed and the point order is wrong?
 }
 
 void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha)
