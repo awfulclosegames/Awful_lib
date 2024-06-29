@@ -61,6 +61,9 @@ struct FKBSplineState
 	float Tau[2];
 	float Beta[2];
 
+	UPROPERTY()
+	TArray<FKBSplinePoint> WorkingSet;
+
 	float UndulationTimes[2] = { -1.0f, -1.0f };
 
 #if !UE_BUILD_SHIPPING
@@ -68,6 +71,17 @@ struct FKBSplineState
 	float OriginalUndulationTimes[2] = { -1.0f, -1.0f };
 #endif
 	FKBSplineState();
+	void Reset();
+
+	bool IsValidSegment() const;
+
+	enum WorkingSetPoints
+	{
+		PreviousPoint = 0,
+		FromPoint = 1,
+		ToPoint = 2,
+		NextPoint =3,
+	};
 };
 
 
@@ -90,12 +104,9 @@ public:
 
 //	bool IsValidSegment(int ID) const { return ID >= RootSegment && (ID + RootSegment) < (ControlPoints.Num() - 2); }
 
-	void UpdateWorkingSet();
+	void UpdateWorkingSet(FKBSplineState& State);
 	void Reset();
 private:
-	UPROPERTY()
-	TArray<FKBSplinePoint> WorkingSet;
-
 	int RootSegment = 0;
 };
 

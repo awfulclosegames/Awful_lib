@@ -12,7 +12,7 @@ UKBSplineConfig* USDZ_KBSpline::CreateSplineConfig(FVector Location)
 	{
 		// anchor it on the given location and set that as the *base* point for all splines
 		newItem->OriginPoint.Location = Location;
-		newItem->ControlPoints.Add(newItem->OriginPoint);
+		newItem->ControlPoints.Enqueue(newItem->OriginPoint);
 		return newItem;
 	}
 	return nullptr;
@@ -39,14 +39,22 @@ void USDZ_KBSpline::Reset(UKBSplineConfig* Config)
 	Config->Reset();
 }
 
-void USDZ_KBSpline::GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord)
+//void USDZ_KBSpline::GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord)
+//{
+//	if (IsValid(Config))
+//	{
+//		if(Config->IsValidSegment(SegmentID))
+//		{
+//			outChord = Config->ControlPoints[SegmentID + 1].Location - Config->ControlPoints[SegmentID].Location;
+//		}
+//	}
+//}
+
+void USDZ_KBSpline::GetCurrentChord(FKBSplineState& State, FVector& outChord)
 {
-	if (IsValid(Config))
+	if (State.IsValidSegment())
 	{
-		if(Config->IsValidSegment(SegmentID))
-		{
-			outChord = Config->ControlPoints[SegmentID + 1].Location - Config->ControlPoints[SegmentID].Location;
-		}
+		outChord = State.WorkingSet[FKBSplineState::ToPoint].Location - State.WorkingSet[FKBSplineState::FromPoint].Location;
 	}
 }
 
@@ -60,17 +68,20 @@ void USDZ_KBSpline::AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBound
 
 FKBSplineState USDZ_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int PointID )
 {
-	if (IsValid(Config) && Config->IsValidSegment(PointID))
+	if (IsValid(Config))
 	{
 		FKBSplineState State;
-
-		State.CurrentTraversalSegment = PointID;
-		KBSplineUtils::Prepare(*Config, State);
-
+		PrepareStaateForEvaluation(Config, State, PointID);
 		return State;
 	}
 
 	return FKBSplineState{};
+}
+
+void USDZ_KBSpline::PrepareStaateForEvaluation(UKBSplineConfig* Config, FKBSplineState& State, int PointID)
+{
+	State.CurrentTraversalSegment = PointID;
+	KBSplineUtils::Prepare(*Config, State);
 }
 
 FVector USDZ_KBSpline::Sample(FKBSplineState State)
@@ -102,33 +113,36 @@ FVector USDZ_KBSpline::SampleExplicit(FKBSplineState State, float Completion)
 void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour, float Width)
 {
 #if !UE_BUILD_SHIPPING
-	if (!CVarSDZ_SplineDebug.GetValueOnGameThread())
-		return;
+	//TODO
+	// Rewrite debug drawing
 
-	if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
-	{
-		const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
-		int CPIdx = State.CurrentTraversalSegment - 1;
-		//FVector prevPoint = Config->ControlPoints[CPIdx].Location;
-		//for (int pointNum = 0; pointNum < 4; ++pointNum)
-		//{
-		//	FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
-		//	DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 10.0f);
-		//	prevPoint = Point;
-		//}
+	//if (!CVarSDZ_SplineDebug.GetValueOnGameThread())
+	//	return;
+
+	//if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
+	//{
+	//	const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
+	//	int CPIdx = State.CurrentTraversalSegment - 1;
+	//	//FVector prevPoint = Config->ControlPoints[CPIdx].Location;
+	//	//for (int pointNum = 0; pointNum < 4; ++pointNum)
+	//	//{
+	//	//	FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
+	//	//	DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 10.0f);
+	//	//	prevPoint = Point;
+	//	//}
 
 
-		float step = 0.01f;
-		FVector prev = TraversalStart;
-		for (float Time = 0.0f; Time <= 1.0f; Time += step)
-		{
-			FVector sample = SampleExplicit(State, Time);
-			DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f,0.0f, Width);
-			prev = sample;
-		}
+	//	float step = 0.01f;
+	//	FVector prev = TraversalStart;
+	//	for (float Time = 0.0f; Time <= 1.0f; Time += step)
+	//	{
+	//		FVector sample = SampleExplicit(State, Time);
+	//		DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f,0.0f, Width);
+	//		prev = sample;
+	//	}
 
-		DrawDebugConstraints(Actor, Config, State);
-	}
+	//	DrawDebugConstraints(Actor, Config, State);
+	//}
 #endif
 }
 
@@ -147,43 +161,47 @@ FKBSplineState USDZ_KBSpline::Split(UKBSplineConfig* Config, const FKBSplineStat
 #if !UE_BUILD_SHIPPING
 void USDZ_KBSpline::DrawDebugConstraints(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State)
 {
-	if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
-	{
-		if (const auto* Bounds = Config->SegmentBounds.Find(State.CurrentTraversalSegment))
-		{
-			DrawDebugLine(Actor->GetWorld(), Bounds->FromBoundMin, Bounds->ToBoundMin, FColor::Red, false, 1.0f);
-			DrawDebugLine(Actor->GetWorld(), Bounds->FromBoundMax, Bounds->ToBoundMax, FColor::Red, false, 1.0f);
+	// TODO
+	// just disabling the debug draw, this needs to be tweaked to go off of the working set and
+	// the pending point queue
+	
+	//if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
+	//{
+	//	if (const auto* Bounds = Config->SegmentBounds.Find(State.CurrentTraversalSegment))
+	//	{
+	//		DrawDebugLine(Actor->GetWorld(), Bounds->FromBoundMin, Bounds->ToBoundMin, FColor::Red, false, 1.0f);
+	//		DrawDebugLine(Actor->GetWorld(), Bounds->FromBoundMax, Bounds->ToBoundMax, FColor::Red, false, 1.0f);
 
-			float step = 0.01f;
-			FVector prev = KBSplineUtils::Sample(State.OriginalCoeffs, 0.0f);
-			for (float Time = 0.0f; Time <= 1.0f; Time += step)
-			{
-				FVector sample = KBSplineUtils::Sample(State.OriginalCoeffs, Time);
-				DrawDebugLine(Actor->GetWorld(), prev, sample, FColor::Orange, false, 1.0f);
-				prev = sample;
-			}
+	//		float step = 0.01f;
+	//		FVector prev = KBSplineUtils::Sample(State.OriginalCoeffs, 0.0f);
+	//		for (float Time = 0.0f; Time <= 1.0f; Time += step)
+	//		{
+	//			FVector sample = KBSplineUtils::Sample(State.OriginalCoeffs, Time);
+	//			DrawDebugLine(Actor->GetWorld(), prev, sample, FColor::Orange, false, 1.0f);
+	//			prev = sample;
+	//		}
 
-			// Draw the Undulation times
-			const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
-			const FVector TraversalEnd = Config->ControlPoints[State.CurrentTraversalSegment + 1].Location;
+	//		// Draw the Undulation times
+	//		const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
+	//		const FVector TraversalEnd = Config->ControlPoints[State.CurrentTraversalSegment + 1].Location;
 
-			FVector TraversalChord = TraversalEnd - TraversalStart;
-			FVector TraversalDir = TraversalChord.GetSafeNormal();
-			for (float U : State.UndulationTimes)
-			{
-				if (U <= 0.0f)
-				{
-					continue;
-				}
-				FVector ExtremePt = KBSplineUtils::Sample(State.OriginalCoeffs, U);
+	//		FVector TraversalChord = TraversalEnd - TraversalStart;
+	//		FVector TraversalDir = TraversalChord.GetSafeNormal();
+	//		for (float U : State.UndulationTimes)
+	//		{
+	//			if (U <= 0.0f)
+	//			{
+	//				continue;
+	//			}
+	//			FVector ExtremePt = KBSplineUtils::Sample(State.OriginalCoeffs, U);
 
-				FVector EPRelative = ExtremePt - TraversalStart;
-				FVector FromPt = TraversalStart + (TraversalDir * EPRelative.Dot(TraversalDir));
+	//			FVector EPRelative = ExtremePt - TraversalStart;
+	//			FVector FromPt = TraversalStart + (TraversalDir * EPRelative.Dot(TraversalDir));
 
-				DrawDebugLine(Actor->GetWorld(), FromPt, ExtremePt, FColor::Yellow, false, 1.0f);
-			}
+	//			DrawDebugLine(Actor->GetWorld(), FromPt, ExtremePt, FColor::Yellow, false, 1.0f);
+	//		}
 
-		}
-	}
+	//	}
+	//}
 }
 #endif

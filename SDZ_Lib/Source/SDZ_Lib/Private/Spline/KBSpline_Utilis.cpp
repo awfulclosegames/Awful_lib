@@ -9,19 +9,23 @@
 bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State, bool bIgnoreBoundes)
 {
 	// is the requested index valid to work with?
-	if (State.CurrentTraversalSegment <= 0 || State.CurrentTraversalSegment >= (Config.ControlPoints.Num() - 2))
-	{
-		return false;
-	}
-	
+    // TBD: is it too annoying to have to manually update the working set?
+    //Config.UpdateWorkingSet(State);
+    if (State.WorkingSet.Num() != 4)
+    {
+        // still not a valid working set so don't continue
+        return false;
+    }
+
     ParameterBlock Block;
     
     // technically an unneeded reference, but it makes the code more readable
 	// gather the points of the active segment
-	const FKBSplinePoint& raw_p0 = Config.ControlPoints[State.CurrentTraversalSegment - 1];
-	const FKBSplinePoint& raw_p1 = Config.ControlPoints[State.CurrentTraversalSegment];
-	const FKBSplinePoint& raw_p2 = Config.ControlPoints[State.CurrentTraversalSegment + 1];
-	const FKBSplinePoint& raw_p3 = Config.ControlPoints[State.CurrentTraversalSegment + 2];
+    // TBD: should the working sets live in the config?
+    const FKBSplinePoint& raw_p0 = State.WorkingSet[0];
+	const FKBSplinePoint& raw_p1 = State.WorkingSet[1];
+	const FKBSplinePoint& raw_p2 = State.WorkingSet[2];
+	const FKBSplinePoint& raw_p3 = State.WorkingSet[3];
 
     Populate(Block, raw_p0, raw_p1, raw_p2, raw_p3);
 
@@ -712,62 +716,66 @@ FVector KBSplineUtils::Sample(const FVector Coeffs[4], float Time)
 
 void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha)
 {
-    // lets try and keep this light
-        float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
-    int CurrentStartId = State.CurrentTraversalSegment;
-    int CurrentDestId = CurrentStartId + 1;
+    // TODO 
+    // this needs to be rewritten for queues or just reconsidered
+
     
-    FKBSplinePoint NewDestPoint;
-    NewDestPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), A);
-    NewDestPoint.Tau = (State.Tau[0] * (1.0f - A)) + (State.Tau[1] * A);
-    NewDestPoint.Beta = (State.Beta[0] * (1.0f - A)) + (State.Beta[1] * A);
+    //// lets try and keep this light
+    //    float A = FMath::Clamp(Alpha, 0.0f, 1.0f);
+    //int CurrentStartId = State.CurrentTraversalSegment;
+    //int CurrentDestId = CurrentStartId + 1;
+    //
+    //FKBSplinePoint NewDestPoint;
+    //NewDestPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), A);
+    //NewDestPoint.Tau = (State.Tau[0] * (1.0f - A)) + (State.Tau[1] * A);
+    //NewDestPoint.Beta = (State.Beta[0] * (1.0f - A)) + (State.Beta[1] * A);
 
-    // Insert the new point between the current and destination points
-    Config.ControlPoints.Insert(NewDestPoint, CurrentDestId);
+    //// Insert the new point between the current and destination points
+    //Config.ControlPoints.Insert(NewDestPoint, CurrentDestId);
 
-    if (State.Time > 0.0f)
-    {
-    // we want to split off a new segment entirely, so add a new start point
-        FKBSplinePoint NewStartPoint;
-        NewStartPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), State.Time);
-        NewStartPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - State.Time)) + (Config.ControlPoints[CurrentDestId].Tau * State.Time);
-        NewStartPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - State.Time)) + (Config.ControlPoints[CurrentDestId].Beta * State.Time);
-        Config.ControlPoints.Insert(NewStartPoint, CurrentDestId);
-        // since we just inserted a new point between the old start and dest our new start
-        // is our old dest ID
-        CurrentStartId = CurrentDestId;
-        ++CurrentDestId;
-    }
+    //if (State.Time > 0.0f)
+    //{
+    //// we want to split off a new segment entirely, so add a new start point
+    //    FKBSplinePoint NewStartPoint;
+    //    NewStartPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), State.Time);
+    //    NewStartPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - State.Time)) + (Config.ControlPoints[CurrentDestId].Tau * State.Time);
+    //    NewStartPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - State.Time)) + (Config.ControlPoints[CurrentDestId].Beta * State.Time);
+    //    Config.ControlPoints.Insert(NewStartPoint, CurrentDestId);
+    //    // since we just inserted a new point between the old start and dest our new start
+    //    // is our old dest ID
+    //    CurrentStartId = CurrentDestId;
+    //    ++CurrentDestId;
+    //}
 
-    // split the curve up, this could be done better but this should maintain the 
-    // shape and also be cheap
-    // except for the buffer insertion, but I can fix that later
+    //// split the curve up, this could be done better but this should maintain the 
+    //// shape and also be cheap
+    //// except for the buffer insertion, but I can fix that later
 
-    // if the undulation points are in our cliping, then add them as separate points
-    for (int i = 0; i < 2; ++i)
-    {
-        float currentUndulation = State.UndulationTimes[i];
-        if (currentUndulation > State.Time && currentUndulation < A)
-        {
-            FKBSplinePoint NewUndulationPoint;
-            // We haven't recomputed the coefficients yet so this will be the correct point for the 
-            // undulation on the old spline
-            NewUndulationPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), currentUndulation);
-            NewUndulationPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - currentUndulation)) + (Config.ControlPoints[CurrentDestId].Tau * currentUndulation);
-            NewUndulationPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - currentUndulation)) + (Config.ControlPoints[CurrentDestId].Beta * currentUndulation);
-            Config.ControlPoints.Insert(NewUndulationPoint, CurrentDestId);
+    //// if the undulation points are in our cliping, then add them as separate points
+    //for (int i = 0; i < 2; ++i)
+    //{
+    //    float currentUndulation = State.UndulationTimes[i];
+    //    if (currentUndulation > State.Time && currentUndulation < A)
+    //    {
+    //        FKBSplinePoint NewUndulationPoint;
+    //        // We haven't recomputed the coefficients yet so this will be the correct point for the 
+    //        // undulation on the old spline
+    //        NewUndulationPoint.Location = Sample(State.PrecomputedCoefficients.GetData(), currentUndulation);
+    //        NewUndulationPoint.Tau = (Config.ControlPoints[CurrentStartId].Tau * (1.0f - currentUndulation)) + (Config.ControlPoints[CurrentDestId].Tau * currentUndulation);
+    //        NewUndulationPoint.Beta = (Config.ControlPoints[CurrentStartId].Beta * (1.0f - currentUndulation)) + (Config.ControlPoints[CurrentDestId].Beta * currentUndulation);
+    //        Config.ControlPoints.Insert(NewUndulationPoint, CurrentDestId);
 
-            State.UndulationTimes[i] -= State.Time;
-            continue;
-        }
-        State.UndulationTimes[i] = -1.0f;
-    }
+    //        State.UndulationTimes[i] -= State.Time;
+    //        continue;
+    //    }
+    //    State.UndulationTimes[i] = -1.0f;
+    //}
 
-    State.Time = 0.0f;
-    State.CurrentTraversalSegment = CurrentStartId;
+    //State.Time = 0.0f;
+    //State.CurrentTraversalSegment = CurrentStartId;
 
-    // now recompute the coefficients and update the state tau/beta
-    Prepare(Config, State, true);
+    //// now recompute the coefficients and update the state tau/beta
+    //Prepare(Config, State, true);
 }
 
 //void KBSplineUtils::Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha)

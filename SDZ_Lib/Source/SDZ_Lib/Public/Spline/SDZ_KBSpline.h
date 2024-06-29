@@ -20,13 +20,16 @@ public:
 	UFUNCTION(BlueprintCallable)
 	static void AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point);
 
-	UFUNCTION(BlueprintCallable)
-	static void RemoveLastSplinePoint(UKBSplineConfig* Config);
+	//UFUNCTION(BlueprintCallable)
+	//static void RemoveLastSplinePoint(UKBSplineConfig* Config);
 
 	static void Reset(UKBSplineConfig* Config);
 
+	//UFUNCTION(BlueprintCallable)
+	//static void GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord);
+
 	UFUNCTION(BlueprintCallable)
-	static void GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord);
+	static void GetCurrentChord(FKBSplineState& State, FVector& outChord);
 
 	UFUNCTION(BlueprintCallable)
 	static void AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds Bound, int SegmentID);
@@ -36,6 +39,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	static FKBSplineState PrepareForEvaluation(UKBSplineConfig* Config, int PointID = 1);
+
+	UFUNCTION(BlueprintCallable)
+	static void PrepareStaateForEvaluation(UKBSplineConfig* Config, FKBSplineState& State, int PointID = 1);
 
 	UFUNCTION(BlueprintCallable)
 	static FVector Sample(FKBSplineState State);
