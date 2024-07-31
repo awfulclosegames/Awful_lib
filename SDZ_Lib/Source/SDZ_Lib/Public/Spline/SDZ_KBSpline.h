@@ -41,7 +41,7 @@ public:
 	static FKBSplineState PrepareForEvaluation(UKBSplineConfig* Config, int PointID = 1);
 
 	UFUNCTION(BlueprintCallable)
-	static void PrepareStaateForEvaluation(UKBSplineConfig* Config, FKBSplineState& State, int PointID = 1);
+	static void PrepareStateForEvaluation(UKBSplineConfig* Config, FKBSplineState& State, int PointID = 1);
 
 	UFUNCTION(BlueprintCallable)
 	static FVector Sample(FKBSplineState State);

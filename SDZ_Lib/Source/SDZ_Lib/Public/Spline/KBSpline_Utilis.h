@@ -10,7 +10,7 @@ class KBSplineUtils
 public:
 
 
-	static bool Prepare(const UKBSplineConfig& Config, FKBSplineState& State, bool bIgnoreBoundes = false);
+	static bool Prepare(UKBSplineConfig& Config, FKBSplineState& State, bool bIgnoreBoundes = false);
 	static FVector Sample(const FVector Coeffs[4], float Time);
 
 	static void Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha);

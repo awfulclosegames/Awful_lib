@@ -100,11 +100,12 @@ void USDZ_SplineMovementComponent::UpdateSplineDirection(float DeltaT, FVector& 
     for (int i = 0; (i < 4) && !m_ValidSpline; ++i)
     {
         int proposedSegment = m_SplineState.CurrentTraversalSegment + 1;
-        //if (m_SplineConfig->IsValidSegment(proposedSegment))
+        USDZ_KBSpline::PrepareStateForEvaluation(m_SplineConfig, m_SplineState, proposedSegment);
+
         if (m_SplineState.IsValidSegment())
         {
             //m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
-            USDZ_KBSpline::PrepareStaateForEvaluation(m_SplineConfig, m_SplineState, proposedSegment);
+            //USDZ_KBSpline::PrepareStaateForEvaluation(m_SplineConfig, m_SplineState, proposedSegment);
 
             USDZ_KBSpline::GetCurrentChord(m_SplineState, m_SegmentChordDir);
             m_CurrentSegLen = m_SegmentChordDir.Length();

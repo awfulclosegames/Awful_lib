@@ -70,7 +70,9 @@ void FKBSplineState::Reset()
 
 bool FKBSplineState::IsValidSegment() const
 {
-	return WorkingSet.Num() == 4;
+	return WorkingSet.Num() == 4 
+		&& Time >= 0.0f
+		&& Time <= 1.0f;
 }
 
 

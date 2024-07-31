@@ -6,15 +6,24 @@
 //  -Not quite agnostic code, Exposing some unneeded Unreal concepts here
 //  -I don't love the parameter management through this. 
 
-bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State, bool bIgnoreBoundes)
+bool KBSplineUtils::Prepare(UKBSplineConfig& Config, FKBSplineState& State, bool bIgnoreBoundes)
 {
+    if (State.IsValidSegment())
+    {
+        return true;
+    }
+
 	// is the requested index valid to work with?
     // TBD: is it too annoying to have to manually update the working set?
     //Config.UpdateWorkingSet(State);
     if (State.WorkingSet.Num() != 4)
     {
-        // still not a valid working set so don't continue
-        return false;
+        Config.UpdateWorkingSet(State);
+        if (State.WorkingSet.Num() != 4)
+        {
+            // still not a valid working set so don't continue
+            return false;
+        }
     }
 
     ParameterBlock Block;

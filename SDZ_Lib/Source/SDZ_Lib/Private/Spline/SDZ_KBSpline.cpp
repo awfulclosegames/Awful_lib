@@ -71,14 +71,14 @@ FKBSplineState USDZ_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int 
 	if (IsValid(Config))
 	{
 		FKBSplineState State;
-		PrepareStaateForEvaluation(Config, State, PointID);
+		PrepareStateForEvaluation(Config, State, PointID);
 		return State;
 	}
 
 	return FKBSplineState{};
 }
 
-void USDZ_KBSpline::PrepareStaateForEvaluation(UKBSplineConfig* Config, FKBSplineState& State, int PointID)
+void USDZ_KBSpline::PrepareStateForEvaluation(UKBSplineConfig* Config, FKBSplineState& State, int PointID)
 {
 	State.CurrentTraversalSegment = PointID;
 	KBSplineUtils::Prepare(*Config, State);
@@ -113,36 +113,49 @@ FVector USDZ_KBSpline::SampleExplicit(FKBSplineState State, float Completion)
 void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour, float Width)
 {
 #if !UE_BUILD_SHIPPING
+
 	//TODO
 	// Rewrite debug drawing
 
 	//if (!CVarSDZ_SplineDebug.GetValueOnGameThread())
 	//	return;
 
-	//if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
+
+	// TODO keep a shadow array for debugging in non shipping builds!
+	//TArray<FKBSplinePoint> TempSplinePoints;
+	//// ugh queues are very limited in Unreal
+	////		copy to a local, and then rebuild the queue since copy is destructive
+	//FKBSplinePoint TempPoint;
+	//while (Config->ControlPoints.Dequeue(TempPoint))
 	//{
-	//	const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
-	//	int CPIdx = State.CurrentTraversalSegment - 1;
-	//	//FVector prevPoint = Config->ControlPoints[CPIdx].Location;
-	//	//for (int pointNum = 0; pointNum < 4; ++pointNum)
-	//	//{
-	//	//	FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
-	//	//	DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 10.0f);
-	//	//	prevPoint = Point;
-	//	//}
-
-
-	//	float step = 0.01f;
-	//	FVector prev = TraversalStart;
-	//	for (float Time = 0.0f; Time <= 1.0f; Time += step)
-	//	{
-	//		FVector sample = SampleExplicit(State, Time);
-	//		DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f,0.0f, Width);
-	//		prev = sample;
-	//	}
-
-	//	DrawDebugConstraints(Actor, Config, State);
+	//	TempSplinePoints.Add(TempPoint);
 	//}
+
+
+	if (IsValid(Actor) && IsValid(Config) && State.IsValidSegment())
+	{
+		const FVector TraversalStart = State.WorkingSet[1].Location;
+		int CPIdx = State.CurrentTraversalSegment - 1;
+		//FVector prevPoint = Config->ControlPoints[CPIdx].Location;
+		//for (int pointNum = 0; pointNum < 4; ++pointNum)
+		//{
+		//	FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
+		//	DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 10.0f);
+		//	prevPoint = Point;
+		//}
+
+
+		float step = 0.01f;
+		FVector prev = TraversalStart;
+		for (float Time = 0.0f; Time <= 1.0f; Time += step)
+		{
+			FVector sample = SampleExplicit(State, Time);
+			DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f,0.0f, Width);
+			prev = sample;
+		}
+
+		DrawDebugConstraints(Actor, Config, State);
+	}
 #endif
 }
 
