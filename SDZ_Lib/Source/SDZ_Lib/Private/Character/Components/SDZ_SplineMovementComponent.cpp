@@ -95,7 +95,7 @@ void USDZ_SplineMovementComponent::UpdateSplineDirection(float DeltaT, FVector& 
     FVector DrivenInput = outInput;
 
     float targetTime = m_HalfRespRate;
-    m_ValidSpline = m_currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
+    m_ValidSpline = m_currentSplineTime <= 1.0f && m_SegmentVelHeur >= 0.0f;
 
     for (int i = 0; (i < 4) && !m_ValidSpline; ++i)
     {

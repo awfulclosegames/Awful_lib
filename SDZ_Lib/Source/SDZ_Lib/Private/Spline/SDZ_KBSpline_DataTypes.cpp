@@ -4,6 +4,7 @@
 #include "Spline/SDZ_KBSpline_DataTypes.h"
 #include "Spline/KBSpline_Utilis.h"
 
+#pragma optimize("",off)
 UKBSplineConfig::UKBSplineConfig(FVector Location)
 	: Super()
 {
@@ -14,17 +15,20 @@ void UKBSplineConfig::UpdateWorkingSet(FKBSplineState& State)
 {
 	// trim old values
 	int CurrentCount = State.WorkingSet.Num();
-	if (CurrentCount > 2)
+	if (CurrentCount > 1)
 	{
-		if (CurrentCount > 3)
+		if (CurrentCount > 2)
 		{
-			State.WorkingSet.RemoveAt(1);
+			if (CurrentCount > 3)
+			{
+				State.WorkingSet.RemoveAt(1);
+			}
+			State.WorkingSet.RemoveAt(0);
 		}
-		State.WorkingSet.RemoveAt(0);
-	}
-	else
-	{
-		State.WorkingSet.Empty();
+		else
+		{
+			State.WorkingSet.Empty();
+		}
 	}
 	int ToAdd = 4 - State.WorkingSet.Num();
 	// try and restock from the control point buffer
