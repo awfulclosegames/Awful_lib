@@ -1,4 +1,4 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Strati D. Zerbinis 2025. All Rights Reserved.
 
 
 #include "SDZ_LibGameModeBase.h"

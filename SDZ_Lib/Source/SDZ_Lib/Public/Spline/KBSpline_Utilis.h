@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿// Copyright Strati D. Zerbinis, 2025. All Rights Reserved.
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Math/Vector.h"
@@ -10,10 +11,10 @@ class KBSplineUtils
 public:
 
 
-	static bool Prepare(UKBSplineConfig& Config, FKBSplineState& State, bool bIgnoreBoundes = false);
+	static bool Prepare(const UKBSplineConfig& Config, FKBSplineState& State, bool bIgnoreBoundes = false);
 	static FVector Sample(const FVector Coeffs[4], float Time);
 
-	static void Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha);
+	//static void Split(UKBSplineConfig& Config, FKBSplineState& State, float Alpha);
 
 
 private:
@@ -50,7 +51,9 @@ private:
 		EndMax = 3,
 	};
 
-	static void Populate(ParameterBlock& Block, const FKBSplinePoint& P0, const FKBSplinePoint& P1, const FKBSplinePoint& P2, const FKBSplinePoint& P3);
+	//static void Populate(ParameterBlock& Block, const FKBSplinePoint& P0, const FKBSplinePoint& P1, const FKBSplinePoint& P2, const FKBSplinePoint& P3);
+	static void Populate(ParameterBlock& Block, FKBSplineState& State);
+
 	static void GenerateCoeffisients(FVector points[4], ParameterBlock& Block, FVector Coeffs[4]);
 	static void ComputeUndulationTimes(float UndulationTimes[2], const ParameterBlock& Block);
 	static bool RestrictToBounds(const float UndulationTimes[2], ParameterBlock& Block);

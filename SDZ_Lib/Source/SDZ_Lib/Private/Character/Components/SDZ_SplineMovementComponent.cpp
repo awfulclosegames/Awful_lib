@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Strati D. Zerbinis 2025. All Rights Reserved.
 
 
 #include "Character/Components/SDZ_SplineMovementComponent.h"
@@ -10,7 +10,7 @@
 
 #include "Character/SPlineTestCharacter.h"
 
-
+#pragma optimize("",off)
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
 static TAutoConsoleVariable<bool> CVarSDZ_SplineMoveDebug(TEXT("sdz.SplineMovement.Debug"), true, TEXT("Enable/Disable debug visualization for the Point of interest system"));
@@ -90,32 +90,29 @@ void USDZ_SplineMovementComponent::UpdateSplineDirection(float DeltaT, FVector& 
     float quantumUpdate = DeltaT / m_HalfRespRate;
     // project onto the spline segment chord, the character's expected movement. Clumsy! but functional for this demo
     FVector expectedMovement = m_Character->GetActorForwardVector() * m_SegmentVelHeur * DeltaT;
-    m_currentSplineTime += FMath::Max(quantumUpdate,m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
+    m_currentSplineTime += FMath::Max(quantumUpdate, m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
 
     FVector DrivenInput = outInput;
 
     float targetTime = m_HalfRespRate;
-    m_ValidSpline = m_currentSplineTime <= 1.0f && m_SegmentVelHeur >= 0.0f;
+    m_ValidSpline = m_currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
 
     for (int i = 0; (i < 4) && !m_ValidSpline; ++i)
     {
         int proposedSegment = m_SplineState.CurrentTraversalSegment + 1;
-        USDZ_KBSpline::PrepareStateForEvaluation(m_SplineConfig, m_SplineState, proposedSegment);
-
-        if (m_SplineState.IsValidSegment())
+        if (m_SplineConfig->IsValidSegment(proposedSegment))
         {
-            //m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
-            //USDZ_KBSpline::PrepareStaateForEvaluation(m_SplineConfig, m_SplineState, proposedSegment);
+            m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
 
-            USDZ_KBSpline::GetCurrentChord(m_SplineState, m_SegmentChordDir);
+            USDZ_KBSpline::GetChord(m_SplineConfig, proposedSegment, m_SegmentChordDir);
             m_CurrentSegLen = m_SegmentChordDir.Length();
             if (m_CurrentSegLen > 0.0f)
             {
                 m_SegmentChordDir /= m_CurrentSegLen;
             }
-            
+
             m_SegmentVelHeur = m_CurrentSegLen / targetTime;
-            
+
             expectedMovement = m_Character->GetActorForwardVector() * m_SegmentVelHeur * DeltaT;
 
             m_currentSplineTime = FMath::Max(quantumUpdate, m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
@@ -138,6 +135,62 @@ void USDZ_SplineMovementComponent::UpdateSplineDirection(float DeltaT, FVector& 
         outInput = (splinePoint - m_Character->GetActorLocation()) / (GetMaxSpeed() * DeltaT);
     }
 }
+
+
+//
+//void USDZ_SplineMovementComponent::UpdateSplineDirection(float DeltaT, FVector& outInput)
+//{
+//    float quantumUpdate = DeltaT / m_HalfRespRate;
+//    // project onto the spline segment chord, the character's expected movement. Clumsy! but functional for this demo
+//    FVector expectedMovement = m_Character->GetActorForwardVector() * m_SegmentVelHeur * DeltaT;
+//    m_currentSplineTime += FMath::Max(quantumUpdate,m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
+//
+//    FVector DrivenInput = outInput;
+//
+//    float targetTime = m_HalfRespRate;
+//    m_ValidSpline = m_currentSplineTime <= 1.0f && m_SegmentVelHeur >= 0.0f && m_SplineState.IsValidSegment();
+//
+//    for (int i = 0; (i < 4) && !m_ValidSpline; ++i)
+//    {
+//        int proposedSegment = m_SplineState.CurrentTraversalSegment + 1;
+//        USDZ_KBSpline::PrepareStateForEvaluation(m_SplineConfig, m_SplineState, proposedSegment);
+//
+//        if (m_SplineState.IsValidSegment())
+//        {
+//            //m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
+//            //USDZ_KBSpline::PrepareStaateForEvaluation(m_SplineConfig, m_SplineState, proposedSegment);
+//
+//            USDZ_KBSpline::GetCurrentChord(m_SplineState, m_SegmentChordDir);
+//            m_CurrentSegLen = m_SegmentChordDir.Length();
+//            if (m_CurrentSegLen > 0.0f)
+//            {
+//                m_SegmentChordDir /= m_CurrentSegLen;
+//            }
+//            
+//            m_SegmentVelHeur = m_CurrentSegLen / targetTime;
+//            
+//            expectedMovement = m_Character->GetActorForwardVector() * m_SegmentVelHeur * DeltaT;
+//
+//            m_currentSplineTime = FMath::Max(quantumUpdate, m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
+//            m_ValidSpline = m_currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
+//        }
+//        else
+//        {
+//            DrivenInput.Z = 0.0f;
+//            m_NextPointTarget += DrivenInput * GetMaxSpeed() * targetTime;
+//
+//            USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_NextPointTarget , MoveTensioning, MoveBias });
+//        }
+//    }
+//
+//    if (m_ValidSpline)
+//    {
+//        FVector OriginalInput = outInput;
+//        m_SplineState.Time = m_currentSplineTime;
+//        FVector splinePoint = USDZ_KBSpline::Sample(m_SplineState);
+//        outInput = (splinePoint - m_Character->GetActorLocation()) / (GetMaxSpeed() * DeltaT);
+//    }
+//}
 
 void USDZ_SplineMovementComponent::ResetSplineState()
 {

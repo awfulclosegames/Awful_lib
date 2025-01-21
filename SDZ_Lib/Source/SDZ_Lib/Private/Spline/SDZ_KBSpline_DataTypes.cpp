@@ -1,52 +1,69 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Strati D. Zerbinis, 2025. All Rights Reserved.
 
 
 #include "Spline/SDZ_KBSpline_DataTypes.h"
 #include "Spline/KBSpline_Utilis.h"
 
-#pragma optimize("",off)
+// 20x 4 point segments, overkill as a default but still not a ton of memory 
+const int UKBSplineConfig::sDefaultBufferLength = 80;
+
 UKBSplineConfig::UKBSplineConfig(FVector Location)
 	: Super()
+	, ControlPoints(sDefaultBufferLength)
 {
-	//OriginPoint.Location = Location;
+	OriginPoint.Location = Location;
 }
 
-void UKBSplineConfig::UpdateWorkingSet(FKBSplineState& State)
-{
-	// trim old values
-	int CurrentCount = State.WorkingSet.Num();
-	if (CurrentCount > 1)
-	{
-		if (CurrentCount > 2)
-		{
-			if (CurrentCount > 3)
-			{
-				State.WorkingSet.RemoveAt(1);
-			}
-			State.WorkingSet.RemoveAt(0);
-		}
-		else
-		{
-			State.WorkingSet.Empty();
-		}
-	}
-	int ToAdd = 4 - State.WorkingSet.Num();
-	// try and restock from the control point buffer
 
-	for (int i = 0; i < ToAdd; ++i)
+UKBSplineConfig::UKBSplineConfig(FVector Location, int NumPoints)
+	: Super()
+	, ControlPoints(NumPoints)
+{
+	OriginPoint.Location = Location;
+}
+
+void UKBSplineConfig::PeekSegment(int ID, TArray<FKBSplinePoint>& Points) const
+{
+	int normalizedID = ID - MinimumSegment;
+	if (ControlPoints.Num() > normalizedID + 2)
 	{
-		FKBSplinePoint Point;
-		if (ControlPoints.Dequeue(Point))
-		{
-			State.WorkingSet.Add(Point);
-		}
+		// discrete points since the ring buffer might wrap so a contiguous series of points might be non-contiguous in memory
+		Points[FKBSplineState::PreviousPoint] = ControlPoints[normalizedID - 1];
+		Points[FKBSplineState::FromPoint] = ControlPoints[normalizedID];
+		Points[FKBSplineState::ToPoint] = ControlPoints[normalizedID + 1];
+		Points[FKBSplineState::NextPoint] = ControlPoints[normalizedID + 2];
 	}
+}
+
+void UKBSplineConfig::ConsumeSegment(int ID)
+{
+	int normalizedID = ID - MinimumSegment;
+	if (ControlPoints.Num() > normalizedID + 2)
+	{
+		ControlPoints.PopFront();
+	}
+}
+
+void UKBSplineConfig::Add(FKBSplinePoint& Point)
+{
+	ControlPoints.Add(Point);
+}
+
+int UKBSplineConfig::GetLastSegment() const
+{
+	return ControlPoints.Num() + MinimumSegment;
+}
+
+void UKBSplineConfig::ClearToCommitments()
+{
+	int Length = FMath::Max(0, ControlPoints.Num() - CommitPoint);
+	ControlPoints.Pop(Length);
 }
 
 void UKBSplineConfig::Reset()
 {
-	ControlPoints.Empty();
-	SegmentBounds.Empty();
+	CommitPoint = 0;
+	ControlPoints.Reset();
 }
 
 
@@ -59,24 +76,16 @@ FKBSplineState::FKBSplineState()
 
 void FKBSplineState::Reset()
 {
-	for (int i = 0; i < 2; ++i)
-	{
-		Tau[i] = 0.0f;
-		Beta[i] = 0.0f;
-		OriginalUndulationTimes[i] = -1.0f;
-	}
-	WorkingSet.Empty();
-	for (int i = 0; i < 4; ++i)
-	{
-		OriginalCoeffs[i] = { 0.0f,0.0f,0.0f };
-	}
+	Tau[0] = -1.0f;
+	Tau[1] = -1.0f;
+	Beta[0] = 0.0f;
+	Beta[1] = 0.0f;
+	Gamma[0] = 0.0f;
+	Gamma[1] = 0.0f;
 }
 
 bool FKBSplineState::IsValidSegment() const
 {
-	return WorkingSet.Num() == 4 
-		&& Time >= 0.0f
-		&& Time <= 1.0f;
+	return false;
 }
-
 

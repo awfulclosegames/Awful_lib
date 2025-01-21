@@ -1,10 +1,11 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Strati D. Zerbinis, 2025. All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Containers/Queue.h"
+//#include "Containers/Queue.h"
+#include "Containers/RingBuffer.h"
 
 #include "SDZ_KBSpline_DataTypes.generated.h"
 
@@ -20,7 +21,27 @@ struct FKBSplinePoint
 	float Tau = -1.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Beta = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Gamma = 0.0f;
 };
+
+
+USTRUCT(BlueprintType)
+struct FKBAnchorPoint
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FKBSplinePoint Point;
+
+	// this could be a radius instead. Assume tetragons for now
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector MinBound = { 0.0f, 0.0f, 0.0f };
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector MaxBound = { 0.0f, 0.0f, 0.0f };
+
+};
+
 
 USTRUCT(BlueprintType)
 struct FKBSplineBounds
@@ -51,6 +72,13 @@ struct FKBSplineState
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Time = 0.0f;
 
+	UPROPERTY()
+	TArray<FKBSplinePoint> WorkingSet;
+
+	UPROPERTY()
+	TArray<FKBAnchorPoint> Anchors;
+
+
 	// ************************************************************************
 	// SUPPLIMENTARY STATE
 	// ************************************************************************
@@ -60,9 +88,7 @@ struct FKBSplineState
 	// core state and supplimentary state since this isn't needed for sampling
 	float Tau[2];
 	float Beta[2];
-
-	UPROPERTY()
-	TArray<FKBSplinePoint> WorkingSet;
+	float Gamma[2];
 
 	float UndulationTimes[2] = { -1.0f, -1.0f };
 
@@ -70,7 +96,9 @@ struct FKBSplineState
 	FVector OriginalCoeffs[4] = { {0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	float OriginalUndulationTimes[2] = { -1.0f, -1.0f };
 #endif
+
 	FKBSplineState();
+
 	void Reset();
 
 	bool IsValidSegment() const;
@@ -80,8 +108,9 @@ struct FKBSplineState
 		PreviousPoint = 0,
 		FromPoint = 1,
 		ToPoint = 2,
-		NextPoint =3,
+		NextPoint = 3,
 	};
+
 };
 
 
@@ -90,7 +119,8 @@ class UKBSplineConfig : public UObject
 {
 	GENERATED_BODY()
 public:
-	TQueue<FKBSplinePoint> ControlPoints;
+
+	TRingBuffer<FKBSplinePoint> ControlPoints;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TMap<int, FKBSplineBounds> SegmentBounds;
@@ -98,15 +128,30 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FKBSplinePoint OriginPoint;
 
+	/** Distance from the head of the control points list that must be consumed before any new changes can take effect
+	*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int CommitPoint = 0;
+
 	UKBSplineConfig() : Super() {}
 
 	UKBSplineConfig(FVector Location);
+	UKBSplineConfig(FVector Location, int NumPoints);
 
-//	bool IsValidSegment(int ID) const { return ID >= RootSegment && (ID + RootSegment) < (ControlPoints.Num() - 2); }
+	void PeekSegment(int ID, TArray<FKBSplinePoint>& Points) const;
+	void ConsumeSegment(int ID);
 
-	void UpdateWorkingSet(FKBSplineState& State);
+
+	bool IsValidSegment(int ID) const { return ID > 1 && ID < (ControlPoints.Num() - 2); }
+
+	void Add(FKBSplinePoint& Point);
+	int GetLastSegment()const;
+
+	void ClearToCommitments();
 	void Reset();
 private:
-	int RootSegment = 0;
+	static const int sDefaultBufferLength;
+
+	int MinimumSegment = 0;
 };
 

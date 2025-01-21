@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Strati D. Zerbinis, 2025. All Rights Reserved.
 
 #pragma once
 
@@ -18,18 +18,15 @@ class SDZ_LIB_API USDZ_KBSpline : public UBlueprintFunctionLibrary
 public:
 
 	UFUNCTION(BlueprintCallable)
-	static void AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point);
+	static int AddSplinePoint(UKBSplineConfig* Config, FKBSplinePoint Point);
 
-	//UFUNCTION(BlueprintCallable)
-	//static void RemoveLastSplinePoint(UKBSplineConfig* Config);
+	UFUNCTION(BlueprintCallable)
+	static void RemoveLastSplinePoint(UKBSplineConfig* Config);
 
 	static void Reset(UKBSplineConfig* Config);
 
-	//UFUNCTION(BlueprintCallable)
-	//static void GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord);
-
 	UFUNCTION(BlueprintCallable)
-	static void GetCurrentChord(FKBSplineState& State, FVector& outChord);
+	static void GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord);
 
 	UFUNCTION(BlueprintCallable)
 	static void AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds Bound, int SegmentID);
@@ -41,9 +38,6 @@ public:
 	static FKBSplineState PrepareForEvaluation(UKBSplineConfig* Config, int PointID = 1);
 
 	UFUNCTION(BlueprintCallable)
-	static void PrepareStateForEvaluation(UKBSplineConfig* Config, FKBSplineState& State, int PointID = 1);
-
-	UFUNCTION(BlueprintCallable)
 	static FVector Sample(FKBSplineState State);
 
 	UFUNCTION(BlueprintCallable)
@@ -52,8 +46,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	static void DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour = FColor::Blue, float Width = 0.0f);
 
-	UFUNCTION(BlueprintCallable)
-	static FKBSplineState Split(UKBSplineConfig* Config, const FKBSplineState State, float Alpha);
+	//UFUNCTION(BlueprintCallable)
+	//static FKBSplineState Split(UKBSplineConfig* Config, const FKBSplineState State, float Alpha);
 
 private:
 #if !UE_BUILD_SHIPPING
