@@ -46,9 +46,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	static void DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour = FColor::Blue, float Width = 0.0f);
 
-	//UFUNCTION(BlueprintCallable)
-	//static FKBSplineState Split(UKBSplineConfig* Config, const FKBSplineState State, float Alpha);
-
 private:
 #if !UE_BUILD_SHIPPING
 	static void DrawDebugConstraints(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State);

@@ -22,9 +22,9 @@ UKBSplineConfig::UKBSplineConfig(FVector Location, int NumPoints)
 	OriginPoint.Location = Location;
 }
 
-void UKBSplineConfig::PeekSegment(int ID, TArray<FKBSplinePoint>& Points) const
+void UKBSplineConfig::PeekSegment(int SegmentID, TArray<FKBSplinePoint>& Points) const
 {
-	int normalizedID = ID - MinimumSegment;
+	int normalizedID = SegmentID - MinimumSegment;
 	if (ControlPoints.Num() > normalizedID + 2)
 	{
 		// discrete points since the ring buffer might wrap so a contiguous series of points might be non-contiguous in memory
@@ -35,13 +35,30 @@ void UKBSplineConfig::PeekSegment(int ID, TArray<FKBSplinePoint>& Points) const
 	}
 }
 
-void UKBSplineConfig::ConsumeSegment(int ID)
+void UKBSplineConfig::ConsumeSegment(int SegmentID)
 {
-	int normalizedID = ID - MinimumSegment;
+	int normalizedID = SegmentID - MinimumSegment;
 	if (ControlPoints.Num() > normalizedID + 2)
 	{
 		ControlPoints.PopFront();
 	}
+}
+
+void UKBSplineConfig::GetTravelChord(int SegmentID, FVector& outChord)
+{
+	if (IsValidSegment(SegmentID))
+	{
+		outChord = ControlPoints[SegmentID + 1].Location - ControlPoints[SegmentID].Location;
+
+		return;
+	}
+	outChord = FVector(0.0f);
+}
+
+bool UKBSplineConfig::IsValidSegment(int SegmentID) const
+{
+	int normalizedID = SegmentID - MinimumSegment;
+	return normalizedID > 0 && normalizedID < (ControlPoints.Num() - 2);
 }
 
 void UKBSplineConfig::Add(FKBSplinePoint& Point)

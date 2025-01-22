@@ -49,7 +49,7 @@ void USDZ_KBSpline::GetChord(UKBSplineConfig* Config, int SegmentID, FVector& ou
 	{
 		if(Config->IsValidSegment(SegmentID))
 		{
-			outChord = Config->ControlPoints[SegmentID + 1].Location - Config->ControlPoints[SegmentID].Location;
+			Config->GetTravelChord(SegmentID, outChord);
 		}
 	}
 }
@@ -136,17 +136,6 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 #endif
 }
 
-//FKBSplineState USDZ_KBSpline::Split(UKBSplineConfig* Config, const FKBSplineState State, float Alpha)
-//{
-//	FKBSplineState SplitState = State;
-//
-//	if (IsValid(Config))
-//	{
-//		KBSplineUtils::Split(*Config, SplitState, Alpha);
-//	}
-//
-//	return SplitState;
-//}
 
 #if !UE_BUILD_SHIPPING
 void USDZ_KBSpline::DrawDebugConstraints(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State)

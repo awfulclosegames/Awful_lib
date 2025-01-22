@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-//#include "Containers/Queue.h"
+
 #include "Containers/RingBuffer.h"
 
 #include "SDZ_KBSpline_DataTypes.generated.h"
@@ -109,6 +109,7 @@ struct FKBSplineState
 		FromPoint = 1,
 		ToPoint = 2,
 		NextPoint = 3,
+		NumberOfPoints = 4,
 	};
 
 };
@@ -138,11 +139,12 @@ public:
 	UKBSplineConfig(FVector Location);
 	UKBSplineConfig(FVector Location, int NumPoints);
 
-	void PeekSegment(int ID, TArray<FKBSplinePoint>& Points) const;
-	void ConsumeSegment(int ID);
+	void PeekSegment(int SegmentID, TArray<FKBSplinePoint>& Points) const;
+	void ConsumeSegment(int SegmentID);
 
+	void GetTravelChord(int SegmentID, FVector& outChord);
 
-	bool IsValidSegment(int ID) const { return ID > 1 && ID < (ControlPoints.Num() - 2); }
+	bool IsValidSegment(int SegmentID) const;
 
 	void Add(FKBSplinePoint& Point);
 	int GetLastSegment()const;
