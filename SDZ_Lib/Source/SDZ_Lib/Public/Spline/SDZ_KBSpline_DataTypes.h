@@ -63,6 +63,16 @@ USTRUCT(BlueprintType)
 struct FKBSplineState
 {
 	GENERATED_BODY()
+
+	enum WorkingSetPoints
+	{
+		PreviousPoint = 0,
+		FromPoint = 1,
+		ToPoint = 2,
+		NextPoint = 3,
+		NumberOfPoints = 4,
+	};
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int CurrentTraversalSegment = -1;
 
@@ -73,7 +83,7 @@ struct FKBSplineState
 	float Time = 0.0f;
 
 	UPROPERTY()
-	TArray<FKBSplinePoint> WorkingSet;
+	FKBSplinePoint WorkingSet[WorkingSetPoints::NumberOfPoints];
 
 	UPROPERTY()
 	TArray<FKBAnchorPoint> Anchors;
@@ -103,15 +113,6 @@ struct FKBSplineState
 
 	bool IsValidSegment() const;
 
-	enum WorkingSetPoints
-	{
-		PreviousPoint = 0,
-		FromPoint = 1,
-		ToPoint = 2,
-		NextPoint = 3,
-		NumberOfPoints = 4,
-	};
-
 };
 
 
@@ -139,7 +140,7 @@ public:
 	UKBSplineConfig(FVector Location);
 	UKBSplineConfig(FVector Location, int NumPoints);
 
-	void PeekSegment(int SegmentID, TArray<FKBSplinePoint>& Points) const;
+	void PeekSegment(int SegmentID, FKBSplinePoint Points[4]) const;
 	void ConsumeSegment(int SegmentID);
 
 	void GetTravelChord(int SegmentID, FVector& outChord);
@@ -151,6 +152,12 @@ public:
 
 	void ClearToCommitments();
 	void Reset();
+
+	int GetNextCandidateSegment(int SegmentID) const;
+
+	// I believe this is only exposed for debug
+	int NormalizeSegmentID(int SegmentID) const {return SegmentID - MinimumSegment;}
+
 private:
 	static const int sDefaultBufferLength;
 

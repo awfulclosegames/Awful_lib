@@ -22,9 +22,9 @@ UKBSplineConfig::UKBSplineConfig(FVector Location, int NumPoints)
 	OriginPoint.Location = Location;
 }
 
-void UKBSplineConfig::PeekSegment(int SegmentID, TArray<FKBSplinePoint>& Points) const
+void UKBSplineConfig::PeekSegment(int SegmentID, FKBSplinePoint Points[4]) const
 {
-	int normalizedID = SegmentID - MinimumSegment;
+	int normalizedID = NormalizeSegmentID(SegmentID);
 	if (ControlPoints.Num() > normalizedID + 2)
 	{
 		// discrete points since the ring buffer might wrap so a contiguous series of points might be non-contiguous in memory
@@ -37,10 +37,14 @@ void UKBSplineConfig::PeekSegment(int SegmentID, TArray<FKBSplinePoint>& Points)
 
 void UKBSplineConfig::ConsumeSegment(int SegmentID)
 {
-	int normalizedID = SegmentID - MinimumSegment;
-	if (ControlPoints.Num() > normalizedID + 2)
+	if (IsValidSegment(SegmentID))
 	{
-		ControlPoints.PopFront();
+		int normalizedID = NormalizeSegmentID(SegmentID);
+		if (ControlPoints.Num() > normalizedID + 2)
+		{
+			ControlPoints.PopFront();
+		}
+		++MinimumSegment;
 	}
 }
 
@@ -48,7 +52,8 @@ void UKBSplineConfig::GetTravelChord(int SegmentID, FVector& outChord)
 {
 	if (IsValidSegment(SegmentID))
 	{
-		outChord = ControlPoints[SegmentID + 1].Location - ControlPoints[SegmentID].Location;
+		int normalizedID = NormalizeSegmentID(SegmentID);
+		outChord = ControlPoints[normalizedID + 1].Location - ControlPoints[normalizedID].Location;
 
 		return;
 	}
@@ -57,7 +62,7 @@ void UKBSplineConfig::GetTravelChord(int SegmentID, FVector& outChord)
 
 bool UKBSplineConfig::IsValidSegment(int SegmentID) const
 {
-	int normalizedID = SegmentID - MinimumSegment;
+	int normalizedID = NormalizeSegmentID(SegmentID);
 	return normalizedID > 0 && normalizedID < (ControlPoints.Num() - 2);
 }
 
@@ -83,6 +88,14 @@ void UKBSplineConfig::Reset()
 	ControlPoints.Reset();
 }
 
+int UKBSplineConfig::GetNextCandidateSegment(int SegmentID) const
+{
+	if (IsValidSegment(SegmentID))
+	{
+		return ++SegmentID;
+	}
+	return MinimumSegment + 1;
+}
 
 FKBSplineState::FKBSplineState()
 	: PrecomputedCoefficients({ {0.0f,0.0f,0.0f}, 

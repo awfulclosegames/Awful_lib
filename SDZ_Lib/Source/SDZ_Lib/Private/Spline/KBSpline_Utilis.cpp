@@ -16,7 +16,7 @@ bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State
 	
     ParameterBlock Block;
 
-    State.WorkingSet.SetNum(FKBSplineState::NumberOfPoints);
+    // the copy into the local working set could be eliminated at a later date
     Config.PeekSegment(State.CurrentTraversalSegment, State.WorkingSet);
 
     Populate(Block, State);

@@ -39,6 +39,7 @@ void USDZ_KBSpline::RemoveLastSplinePoint(UKBSplineConfig* Config)
 
 void USDZ_KBSpline::Reset(UKBSplineConfig* Config)
 {
+	Config->Reset();
 	Config->ControlPoints.Empty();
 	Config->SegmentBounds.Empty();
 }
@@ -111,15 +112,18 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 
 	if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
 	{
-		const FVector TraversalStart = Config->ControlPoints[State.CurrentTraversalSegment].Location;
-		int CPIdx = State.CurrentTraversalSegment - 1;
-		//FVector prevPoint = Config->ControlPoints[CPIdx].Location;
-		//for (int pointNum = 0; pointNum < 4; ++pointNum)
-		//{
-		//	FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
-		//	DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 10.0f);
-		//	prevPoint = Point;
-		//}
+		int normalizedSegment = Config->NormalizeSegmentID(State.CurrentTraversalSegment);
+		const FVector TraversalStart = Config->ControlPoints[normalizedSegment].Location;
+		
+		int CPIdx = normalizedSegment - 1;
+
+		FVector prevPoint = Config->ControlPoints[CPIdx].Location;
+		for (int pointNum = 0; pointNum < 4; ++pointNum)
+		{
+			FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
+			DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 1.0f);
+			prevPoint = Point;
+		}
 
 
 		float step = 0.01f;

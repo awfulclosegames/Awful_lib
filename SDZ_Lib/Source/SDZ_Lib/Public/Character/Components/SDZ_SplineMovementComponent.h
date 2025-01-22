@@ -67,6 +67,8 @@ private:
 
 	FVector m_SegmentChordDir;
 
+	int m_LastValidSegment = 0;
+
 	float m_HalfRespRate = 0.0f;
 
 	float m_CurrentSegLen = 1.0f;
