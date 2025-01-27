@@ -78,6 +78,7 @@ FKBSplineState USDZ_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int 
 	return FKBSplineState{};
 }
 
+// these sample operations are easily vectorizable and probably should be
 FVector USDZ_KBSpline::Sample(FKBSplineState State)
 {
 	// compute the linear combination of 
@@ -109,33 +110,43 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 #if !UE_BUILD_SHIPPING
 	if (!CVarSDZ_SplineDebug.GetValueOnGameThread())
 		return;
+	
 
-	if (IsValid(Actor) && IsValid(Config) && Config->IsValidSegment(State.CurrentTraversalSegment))
+	if (IsValid(Actor) && IsValid(Config))
 	{
-		int normalizedSegment = Config->NormalizeSegmentID(State.CurrentTraversalSegment);
-		const FVector TraversalStart = Config->ControlPoints[normalizedSegment].Location;
-		
-		int CPIdx = normalizedSegment - 1;
-
-		FVector prevPoint = Config->ControlPoints[CPIdx].Location;
-		for (int pointNum = 0; pointNum < 4; ++pointNum)
+		FVector prevPoint = Config->ControlPoints.First().Location;
+		for (auto& point : Config->ControlPoints)
 		{
-			FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
-			DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 1.0f);
-			prevPoint = Point;
+			DrawDebugLine(Actor->GetWorld(), prevPoint, point.Location, FColor::White, false, 1.0f);
+			prevPoint = point.Location;
 		}
 
-
-		float step = 0.01f;
-		FVector prev = TraversalStart;
-		for (float Time = 0.0f; Time <= 1.0f; Time += step)
+		if (Config->IsValidSegment(State.CurrentTraversalSegment))
 		{
-			FVector sample = SampleExplicit(State, Time);
-			DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f,0.0f, Width);
-			prev = sample;
-		}
+			int normalizedSegment = Config->NormalizeSegmentID(State.CurrentTraversalSegment);
+			const FVector TraversalStart = Config->ControlPoints[normalizedSegment].Location;
 
-		DrawDebugConstraints(Actor, Config, State);
+			int CPIdx = normalizedSegment - 1;
+
+			//FVector prevPoint = Config->ControlPoints[CPIdx].Location;
+			//for (int pointNum = 0; pointNum < 4; ++pointNum)
+			//{
+			//	FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
+			//	DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 1.0f);
+			//	prevPoint = Point;
+			//}
+
+			float step = 0.01f;
+			FVector prev = TraversalStart;
+			for (float Time = 0.0f; Time <= 1.0f; Time += step)
+			{
+				FVector sample = SampleExplicit(State, Time);
+				DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f, 0.0f, Width);
+				prev = sample;
+			}
+
+			DrawDebugConstraints(Actor, Config, State);
+		}
 	}
 #endif
 }

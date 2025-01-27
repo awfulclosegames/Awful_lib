@@ -41,6 +41,7 @@ public:
 
 	virtual void BeginPlay() override;
 
+	virtual void PerformMovement(float DeltaSeconds) override;
 	virtual void PhysWalking(float deltaTime, int32 Iterations) override;
 
 	virtual void ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds) override;
@@ -54,7 +55,12 @@ public:
 private:
 
 	void HandleHitSomethign(const FVector& adjustedVel, FVector& location, FHitResult& hit, float deltaTime);
+
+	void UpdateSplinePoints(float DeltaT, const FVector& Input);
 	void UpdateSplineDirection(float DeltaT, FVector& outInput);
+
+	void EvaluateNavigationSpline(float DeltaT, FVector& outInput);
+
 	void ResetSplineState();
 
 	TObjectPtr<ASplineTestCharacter> m_Character;

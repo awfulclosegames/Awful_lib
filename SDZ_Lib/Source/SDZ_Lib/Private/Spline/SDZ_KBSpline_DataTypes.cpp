@@ -25,7 +25,7 @@ UKBSplineConfig::UKBSplineConfig(FVector Location, int NumPoints)
 void UKBSplineConfig::PeekSegment(int SegmentID, FKBSplinePoint Points[4]) const
 {
 	int normalizedID = NormalizeSegmentID(SegmentID);
-	if (ControlPoints.Num() > normalizedID + 2)
+	if (IsValidNormalizedSegment(normalizedID))
 	{
 		// discrete points since the ring buffer might wrap so a contiguous series of points might be non-contiguous in memory
 		Points[FKBSplineState::PreviousPoint] = ControlPoints[normalizedID - 1];
@@ -37,9 +37,9 @@ void UKBSplineConfig::PeekSegment(int SegmentID, FKBSplinePoint Points[4]) const
 
 void UKBSplineConfig::ConsumeSegment(int SegmentID)
 {
-	if (IsValidSegment(SegmentID))
+	int normalizedID = NormalizeSegmentID(SegmentID);
+	if (IsValidNormalizedSegment(normalizedID))
 	{
-		int normalizedID = NormalizeSegmentID(SegmentID);
 		if (ControlPoints.Num() > normalizedID + 2)
 		{
 			ControlPoints.PopFront();
@@ -50,9 +50,9 @@ void UKBSplineConfig::ConsumeSegment(int SegmentID)
 
 void UKBSplineConfig::GetTravelChord(int SegmentID, FVector& outChord)
 {
-	if (IsValidSegment(SegmentID))
+	int normalizedID = NormalizeSegmentID(SegmentID);
+	if (IsValidNormalizedSegment(normalizedID))
 	{
-		int normalizedID = NormalizeSegmentID(SegmentID);
 		outChord = ControlPoints[normalizedID + 1].Location - ControlPoints[normalizedID].Location;
 
 		return;
@@ -63,8 +63,14 @@ void UKBSplineConfig::GetTravelChord(int SegmentID, FVector& outChord)
 bool UKBSplineConfig::IsValidSegment(int SegmentID) const
 {
 	int normalizedID = NormalizeSegmentID(SegmentID);
-	return normalizedID > 0 && normalizedID < (ControlPoints.Num() - 2);
+	return IsValidNormalizedSegment(normalizedID);
 }
+
+bool UKBSplineConfig::IsValidNormalizedSegment(int SegmentID) const
+{
+	return SegmentID > 0 && SegmentID < (ControlPoints.Num() - 2);
+}
+
 
 void UKBSplineConfig::Add(FKBSplinePoint& Point)
 {
@@ -78,8 +84,11 @@ int UKBSplineConfig::GetLastSegment() const
 
 void UKBSplineConfig::ClearToCommitments()
 {
-	int Length = FMath::Max(0, ControlPoints.Num() - CommitPoint);
-	ControlPoints.Pop(Length);
+	if (IsValidNormalizedSegment(CommitPoint))
+	{
+		int Length = FMath::Max(0, ControlPoints.Num() - CommitPoint);
+		ControlPoints.Pop(Length);
+	}
 }
 
 void UKBSplineConfig::Reset()

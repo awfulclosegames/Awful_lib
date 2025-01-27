@@ -169,6 +169,8 @@ public:
 private:
 	static const int sDefaultBufferLength;
 
+	bool IsValidNormalizedSegment(int SegmentID) const;
+
 	int MinimumSegment = 0;
 };
 
