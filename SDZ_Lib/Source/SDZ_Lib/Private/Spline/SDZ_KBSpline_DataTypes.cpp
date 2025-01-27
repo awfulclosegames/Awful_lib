@@ -86,7 +86,7 @@ void UKBSplineConfig::ClearToCommitments()
 {
 	if (IsValidNormalizedSegment(CommitPoint))
 	{
-		int Length = FMath::Max(0, ControlPoints.Num() - CommitPoint);
+		int Length = FMath::Max(0, ControlPoints.Num() - (CommitPoint + 1));
 		ControlPoints.Pop(Length);
 	}
 }

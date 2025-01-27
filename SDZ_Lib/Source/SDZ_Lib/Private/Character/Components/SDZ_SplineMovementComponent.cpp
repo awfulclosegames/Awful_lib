@@ -105,7 +105,7 @@ void USDZ_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVecto
 
     float targetTime = MovementResponse;
     DrivenInput.Z = 0.0f;
-    m_SplineConfig->CommitPoint = 2;
+    m_SplineConfig->CommitPoint = 3;
 
     m_SplineConfig->ClearToCommitments();
 
