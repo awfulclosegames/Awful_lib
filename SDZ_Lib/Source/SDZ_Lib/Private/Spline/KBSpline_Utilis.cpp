@@ -739,10 +739,10 @@ void KBSplineUtils::ParameterBlock::Localize(const FKBSplineBounds& RawBound)
     Points[2] = RawPoints[2] - RawPoints[1];
     Points[3] = RawPoints[3] - RawPoints[1];
 
-    Bounds[StartMin] = RawBound.FromBoundMin - RawPoints[1];
-    Bounds[StartMax] = RawBound.FromBoundMax - RawPoints[1];
-    Bounds[EndMin] = RawBound.ToBoundMin - RawPoints[1];
-    Bounds[EndMax] = RawBound.ToBoundMax - RawPoints[1];
+    Bounds[StartMin] = RawBound.Anchors[FKBSplineBounds::FromPoint].MinBound - RawPoints[1];
+    Bounds[StartMax] = RawBound.Anchors[FKBSplineBounds::FromPoint].MaxBound - RawPoints[1];
+    Bounds[EndMin] = RawBound.Anchors[FKBSplineBounds::ToPoint].MinBound - RawPoints[1];
+    Bounds[EndMax] = RawBound.Anchors[FKBSplineBounds::ToPoint].MaxBound - RawPoints[1];
 }
 
 void KBSplineUtils::ParameterBlock::AlignToX()

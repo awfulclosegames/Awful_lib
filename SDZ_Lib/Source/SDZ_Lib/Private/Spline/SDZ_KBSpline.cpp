@@ -148,8 +148,8 @@ void USDZ_KBSpline::DrawDebugConstraints(AActor* Actor, const UKBSplineConfig* C
 	{
 		if (const auto* Bounds = Config->SegmentBounds.Find(State.CurrentTraversalSegment))
 		{
-			DrawDebugLine(Actor->GetWorld(), Bounds->FromBoundMin, Bounds->ToBoundMin, FColor::Red, false, 1.0f);
-			DrawDebugLine(Actor->GetWorld(), Bounds->FromBoundMax, Bounds->ToBoundMax, FColor::Red, false, 1.0f);
+			DrawDebugLine(Actor->GetWorld(), Bounds->Anchors[FKBSplineBounds::FromPoint].MaxBound, Bounds->Anchors[FKBSplineBounds::ToPoint].MaxBound, FColor::Orange, false, 1.0f, 0, 1.5f);
+			DrawDebugLine(Actor->GetWorld(), Bounds->Anchors[FKBSplineBounds::FromPoint].MinBound, Bounds->Anchors[FKBSplineBounds::ToPoint].MinBound, FColor::Orange, false, 1.0f, 0, 1.5f);
 
 			float step = 0.01f;
 			FVector prev = KBSplineUtils::Sample(State.OriginalCoeffs, 0.0f);

@@ -31,6 +31,15 @@ struct FKBAnchorPoint
 {
 	GENERATED_BODY()
 
+	// THIS is very much a WiP. 
+	// among the things I'm trying to decide:
+	//		- should this be in absolute extents?
+	//		- should I require an anchor point and make the extents relative?
+	//		- should I make the extents radial or axial?
+	//		- should I require constraints to be coherent on a single acnchor point for multiple segments?
+	//			A- I think probably not. Letting the constraints be different between consecuative segments at a junction
+	//				could be pretty useful and shouldn't cause any issues
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FKBSplinePoint Point;
 
@@ -48,14 +57,15 @@ struct FKBSplineBounds
 {
 	GENERATED_BODY()
 
+	enum AnchorPointTypess
+	{
+		FromPoint = 0,
+		ToPoint = 1,
+	};
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector FromBoundMax;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector FromBoundMin;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector ToBoundMax;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector ToBoundMin;
+	TArray<FKBAnchorPoint> Anchors;
+
 };
 
 // should this be a class instead of struct so I don't need to copy 36 bytes all the time?
@@ -64,7 +74,7 @@ struct FKBSplineState
 {
 	GENERATED_BODY()
 
-	enum WorkingSetPoints
+	enum WorkingSetPointTypes
 	{
 		PreviousPoint = 0,
 		FromPoint = 1,
@@ -72,6 +82,7 @@ struct FKBSplineState
 		NextPoint = 3,
 		NumberOfPoints = 4,
 	};
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int CurrentTraversalSegment = -1;
@@ -83,10 +94,7 @@ struct FKBSplineState
 	float Time = 0.0f;
 
 	UPROPERTY()
-	FKBSplinePoint WorkingSet[WorkingSetPoints::NumberOfPoints];
-
-	UPROPERTY()
-	TArray<FKBAnchorPoint> Anchors;
+	FKBSplinePoint WorkingSet[WorkingSetPointTypes::NumberOfPoints];
 
 
 	// ************************************************************************
