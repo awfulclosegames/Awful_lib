@@ -36,6 +36,7 @@ bool KBSplineUtils::Prepare(const UKBSplineConfig& Config, FKBSplineState& State
     State.Beta[1] = Block.Beta[1];
     GenerateCoeffisients(Block.RawPoints, Block, State.PrecomputedCoefficients.GetData());
 	State.Time = 0.0f;
+    State.Valid = true;
 
 	return true;
 }
@@ -694,6 +695,7 @@ void KBSplineUtils::ComputeAB(ParameterBlock& Block)
 
 void KBSplineUtils::ComputeCD(ParameterBlock& Block)
 {
+
     constexpr float gamma_1 = 0.0f;
 
     /* gamma is the continuity param)*/

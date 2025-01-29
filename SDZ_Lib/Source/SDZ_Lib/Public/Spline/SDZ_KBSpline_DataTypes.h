@@ -21,8 +21,6 @@ struct FKBSplinePoint
 	float Tau = -1.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Beta = 0.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Gamma = 0.0f;
 };
 
 
@@ -96,6 +94,9 @@ struct FKBSplineState
 	UPROPERTY()
 	FKBSplinePoint WorkingSet[WorkingSetPointTypes::NumberOfPoints];
 
+	// this limited. Could reuse a negative time or other flag value instead. Should probably compact this structure when I get time
+	UPROPERTY(BlueprintReadOnly)
+	bool Valid = false;
 
 	// ************************************************************************
 	// SUPPLIMENTARY STATE
@@ -106,7 +107,6 @@ struct FKBSplineState
 	// core state and supplimentary state since this isn't needed for sampling
 	float Tau[2];
 	float Beta[2];
-	float Gamma[2];
 
 	float UndulationTimes[2] = { -1.0f, -1.0f };
 

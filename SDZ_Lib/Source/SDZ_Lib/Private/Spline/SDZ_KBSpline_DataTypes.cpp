@@ -40,9 +40,9 @@ void UKBSplineConfig::ConsumeSegment(int SegmentID)
 	int normalizedID = NormalizeSegmentID(SegmentID);
 	if (IsValidNormalizedSegment(normalizedID))
 	{
-		if (ControlPoints.Num() > normalizedID + 2)
+		if (ControlPoints.Num() >= normalizedID)
 		{
-			ControlPoints.PopFront();
+			ControlPoints.PopFront(normalizedID);
 		}
 		++MinimumSegment;
 	}
@@ -115,16 +115,18 @@ FKBSplineState::FKBSplineState()
 
 void FKBSplineState::Reset()
 {
+	Time = 0.0f;
+
 	Tau[0] = -1.0f;
 	Tau[1] = -1.0f;
 	Beta[0] = 0.0f;
 	Beta[1] = 0.0f;
-	Gamma[0] = 0.0f;
-	Gamma[1] = 0.0f;
+	
+	Valid = false;
 }
 
 bool FKBSplineState::IsValidSegment() const
 {
-	return false;
+	return Valid;
 }
 

@@ -128,14 +128,6 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 
 			int CPIdx = normalizedSegment - 1;
 
-			//FVector prevPoint = Config->ControlPoints[CPIdx].Location;
-			//for (int pointNum = 0; pointNum < 4; ++pointNum)
-			//{
-			//	FVector Point = Config->ControlPoints[CPIdx + pointNum].Location;
-			//	DrawDebugLine(Actor->GetWorld(), prevPoint, Point, FColor::White, false, 1.0f);
-			//	prevPoint = Point;
-			//}
-
 			float step = 0.01f;
 			FVector prev = TraversalStart;
 			for (float Time = 0.0f; Time <= 1.0f; Time += step)
