@@ -127,6 +127,6 @@ void FKBSplineState::Reset()
 
 bool FKBSplineState::IsValidSegment() const
 {
-	return Valid;
+	return Valid && Time < 1.0f && Time >= 0.0f;
 }
 

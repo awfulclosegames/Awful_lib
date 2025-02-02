@@ -114,11 +114,18 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 
 	if (IsValid(Actor) && IsValid(Config))
 	{
+		int CurrentIndex = 0;
 		FVector prevPoint = Config->ControlPoints.First().Location;
 		for (auto& point : Config->ControlPoints)
 		{
-			DrawDebugLine(Actor->GetWorld(), prevPoint, point.Location, FColor::White, false, 1.0f);
+			FColor Color = CurrentIndex <= Config->CommitPoint ? FColor::Yellow : FColor::White;
+if (CurrentIndex <= Config->CommitPoint)
+{
+	DrawDebugLine(Actor->GetWorld(), prevPoint, point.Location, Color, false, 8.0f);
+}
+			DrawDebugLine(Actor->GetWorld(), prevPoint, point.Location, Color, false, 1.0f);
 			prevPoint = point.Location;
+			++CurrentIndex;
 		}
 
 		if (Config->IsValidSegment(State.CurrentTraversalSegment))
@@ -134,6 +141,7 @@ void USDZ_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBS
 			{
 				FVector sample = SampleExplicit(State, Time);
 				DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 1.0f, 0.0f, Width);
+DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, 8.0f, 0.0f, Width);
 				prev = sample;
 			}
 

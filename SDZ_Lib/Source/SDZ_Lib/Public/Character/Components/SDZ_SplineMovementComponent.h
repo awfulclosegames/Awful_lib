@@ -47,6 +47,7 @@ public:
 	virtual void PhysWalking(float deltaTime, int32 Iterations) override;
 
 	virtual void ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds) override;
+	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const;
 
 	void SetUseSpline(bool Value);
 	bool GetUseSpline()const { return m_SplineWalk; }
@@ -67,6 +68,8 @@ private:
 
 	//void EvaluateNavigationSpline(float DeltaT, FVector& outInput);
 	void EvaluateNavigationSpline(float DeltaT);
+	void FOO_EvaluateNavigationSpline(float DeltaT);
+
 
 	void ResetSplineState();
 
@@ -76,20 +79,21 @@ private:
 	UKBSplineConfig* m_SplineConfig;
 	FKBSplineState m_SplineState;
 
-	FVector m_NextPointTarget;
+	//FVector m_NextPointTarget;
 
+	FVector m_CurrentMoveTarget;
 	FVector m_SegmentChordDir;
 
 	int m_LastValidSegment = 0;
+	float m_CurrentSegLen = 1.0f;
 
 	float m_Throttle = 0.0f;
+
 	float m_HalfRespRate = 0.0f;
 
-	float m_CurrentSegLen = 1.0f;
-	float m_SegmentVelHeur = 0.0f;
+	//float m_SegmentVelHeur = 0.0f;
 
-	//float m_currentSplineTime = -1.0f;
 	bool m_SplineWalk = false;
-	bool m_ValidSpline = false;
+	//bool m_ValidSpline = false;
 
 };

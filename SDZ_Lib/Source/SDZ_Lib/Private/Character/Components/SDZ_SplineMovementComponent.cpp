@@ -67,18 +67,12 @@ void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputV
     FVector input = InputVector.GetClampedToMaxSize(1.0f);
     const float RequestedSpeedSquared = input.SizeSquared();
 
-
     if (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER)
     {
         UpdateSplinePoints(DeltaSeconds, input);
 
         FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
         FVector MovementResponseTarget = input * GetMaxSpeed() * MovementResponse;
-
-        //if (m_SplineWalk)
-        //{
-        //    EvaluateNavigationSpline(DeltaSeconds, input);
-        //}
 
 #if !UE_BUILD_SHIPPING
         if (CVarSDZ_SplineMoveDebug.GetValueOnAnyThread())
@@ -100,8 +94,17 @@ void USDZ_SplineMovementComponent::ControlledCharacterMove(const FVector& InputV
         ResetSplineState();
     }
 
-
     Super::ControlledCharacterMove(input, DeltaSeconds);
+}
+
+FRotator USDZ_SplineMovementComponent::ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const
+{
+    FVector velDir = Velocity.GetSafeNormal();
+    if (velDir.SquaredLength() > 0.0f)
+    {
+        return velDir.ToOrientationRotator();
+    }
+    return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
 }
 
 
@@ -115,110 +118,112 @@ void USDZ_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVecto
 
     m_SplineConfig->ClearToCommitments();
 
-    m_NextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
-    m_NextPointTarget += (DrivenInput * GetMaxSpeed() * targetTime);
-    m_NextPointTarget.Z = m_Character->GetActorLocation().Z;
-    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_NextPointTarget , MoveTensioning, MoveBias });
+    FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
+    nextPointTarget += (DrivenInput * GetMaxSpeed() * targetTime);
+    nextPointTarget.Z = m_Character->GetActorLocation().Z;
+    USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
+}
+
+
+void USDZ_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
+{
+    FVector expectedMovement = Velocity * DeltaT;
+    FVector targetOffset = m_CurrentMoveTarget - m_Character->GetActorLocation();
+
+    // if we're too close, then try and update the point on the spline that we are following
+    if (targetOffset.SquaredLength() < expectedMovement.SquaredLength())
+    {
+        targetOffset = FVector::ZeroVector;
+        float quantumUpdate = (DeltaT * Speed * 2.0f) / m_CurrentSegLen;
+        bool done = false;
+
+        // try and update the target point, potentially crossing up to 4 more segments
+        for (int i = 0; (i < 4) && !done; ++i)
+        {
+            if (m_SplineState.IsValidSegment())
+            {
+                // try and update the point within the segment
+                float quantumUpdate = (DeltaT * Speed * 2.0f) / m_CurrentSegLen;
+
+                float candidateTime = quantumUpdate + m_SegmentChordDir.Dot((m_Character->GetActorLocation() - m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location) + expectedMovement) / m_CurrentSegLen;
+                m_SplineState.Time = FMath::Max(0.0f, candidateTime);
+
+            }
+            else
+            {
+                // try and get a new segment
+                int proposedSegment = m_SplineConfig->GetNextCandidateSegment(m_SplineState.CurrentTraversalSegment);
+                m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
+
+                USDZ_KBSpline::GetChord(m_SplineConfig, proposedSegment, m_SegmentChordDir);
+                m_CurrentSegLen = m_SegmentChordDir.Length();
+                if (m_CurrentSegLen > 0.0f)
+                {
+                    m_SegmentChordDir /= m_CurrentSegLen;
+                }
+
+            }
+        }
+
+    }
+
+    // now we have a valid direction to aim we move towards it
+    // perhaps we want to maintain velocity if we don't have a valid point?
+    Velocity = targetOffset.GetSafeNormal() * m_Throttle;
 }
 
 
 
-//void USDZ_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT, FVector& outInput)
-//{
-//    float quantumUpdate = DeltaT / m_HalfRespRate;
-//    // project onto the spline segment chord, the character's expected movement. Clumsy! but functional for this demo
-//    FVector expectedMovement = m_Character->GetActorForwardVector() * m_SegmentVelHeur * DeltaT;
-//    //FVector expectedMovement = Velocity * DeltaT;
-//    m_currentSplineTime += FMath::Max(quantumUpdate, m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
-//
-//    //FVector DrivenInput = outInput;
-//
-//    float targetTime = MovementResponse;
-//    m_ValidSpline = m_currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
-//
-//    for (int i = 0; (i < 4) && !m_ValidSpline; ++i)
-//    {
-//        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("Invalid travel segment, try and get another\n        m_currentSplineTime: %f\n        m_SegmentVelHeur: %f"),
-//            m_currentSplineTime, m_SegmentVelHeur);
-//
-//        int proposedSegment = m_SplineConfig->GetNextCandidateSegment(m_SplineState.CurrentTraversalSegment);
-//        if (m_SplineConfig->IsValidSegment(proposedSegment))
-//        {
-//            m_SplineState = USDZ_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
-//
-//            USDZ_KBSpline::GetChord(m_SplineConfig, proposedSegment, m_SegmentChordDir);
-//            m_CurrentSegLen = m_SegmentChordDir.Length();
-//            if (m_CurrentSegLen > 0.0f)
-//            {
-//                m_SegmentChordDir /= m_CurrentSegLen;
-//            }
-//
-//            m_SegmentVelHeur = FMath::Max(m_CurrentSegLen / targetTime, Speed);
-//            
-//            //expectedMovement = m_Character->GetActorForwardVector() * m_SegmentVelHeur * DeltaT;
-//            expectedMovement = Velocity * DeltaT;
-//
-//            m_currentSplineTime = FMath::Max(quantumUpdate, m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
-//
-//            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("Itteration: %i\n        m_currentSplineTime: %f\n        m_SegmentVelHeur: %f\n        expectedMovement: %s\n        Segment Chord: %s\n        Segment Length: %f"),
-//                i, m_currentSplineTime, m_SegmentVelHeur,
-//                *expectedMovement.ToString(),
-//                *(m_SegmentChordDir * m_CurrentSegLen).ToString(), m_CurrentSegLen);
-//
-//            m_ValidSpline = m_currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
-//
-//            // we want to consume a segment off of the control point buffer. Either the last segment we just completed or 
-//            // the new one which was too short to be travel
-//            int toConsume = proposedSegment;
-//            if (m_ValidSpline)
-//            {
-//                // we can consume our last segment
-//                toConsume = m_LastValidSegment;
-//            }
-//            m_SplineConfig->ConsumeSegment(toConsume);
-//        }
-//    }
-//
-//    if (m_ValidSpline)
-//    {
-//        m_LastValidSegment = m_SplineState.CurrentTraversalSegment;
-//
-//        m_SplineState.Time = m_currentSplineTime;
-//        FVector splinePoint = USDZ_KBSpline::Sample(m_SplineState);
-//        outInput = (splinePoint - m_Character->GetActorLocation()) / (GetMaxSpeed() * DeltaT);
-//    }
-//}
-//
-void USDZ_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
+void USDZ_SplineMovementComponent::FOO_EvaluateNavigationSpline(float DeltaT)
 {
-    float quantumUpdate = DeltaT / m_HalfRespRate;
+    float quantumUpdate = (DeltaT * Speed * 2.0f) / m_CurrentSegLen;
+
     // project onto the spline segment chord, the character's expected movement. Clumsy! but functional for this demo
-    FVector expectedMovement = Velocity.GetSafeNormal() * m_Throttle * DeltaT;
+    //FVector expectedMovement = Velocity.GetSafeNormal() * m_Throttle * DeltaT;
+    FVector expectedMovement = Velocity * DeltaT;
 
-    m_SplineState.Time += FMath::Max(quantumUpdate, m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
-    float currentSplineTime = m_SplineState.Time;
+    // estimate the new target time on the spline by projecting our current point on the chord
+    float candidateTime = quantumUpdate + m_SegmentChordDir.Dot((m_Character->GetActorLocation() - m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location) + expectedMovement) / m_CurrentSegLen;
+    m_SplineState.Time = FMath::Max(0.0f, candidateTime);
+    //m_SplineState.Time += quantumUpdate;
 
-    float targetTime = MovementResponse;
-    m_ValidSpline = currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
 
-    FVector residualDistance(0.0f);
 
-    for (int i = 0; (i < 4) && !m_ValidSpline; ++i)
+
+
+
+
+
+    //m_SplineState.Time = FMath::Max(quantumUpdate, candidateTime);
+
+    //float targetTime = MovementResponse;
+    //m_ValidSpline = currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
+    bool validSpline = m_SplineState.IsValidSegment() && m_SplineState.Time < 1.0f && m_SplineState.Time >= 0.0f;
+
+UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("*****************************\n        quantumUpdate: %f\n        candidateTime: %f\n        expectedMovement: %s\n         new time: %f"),
+quantumUpdate, candidateTime,
+*expectedMovement.ToString(),
+m_SplineState.Time
+);
+UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), m_Character->GetActorLocation() + expectedMovement, FColor::Purple, TEXT(""));
+UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation() + FVector(0,0,10), m_Character->GetActorLocation() + expectedMovement + FVector(0, 0, 10), FColor::Purple, TEXT(""));
+
+    //FVector residualDistance(0.0f);
+
+    for (int i = 0; (i < 4) && !validSpline; ++i)
     {
-        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("Invalid travel segment, try and get another\n        m_currentSplineTime: %f\n        m_SegmentVelHeur: %f"),
-            currentSplineTime, m_SegmentVelHeur);
+        //UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("Invalid travel segment, try and get another\n        m_currentSplineTime: %f\n        m_SegmentVelHeur: %f"),
+        //    currentSplineTime, m_SegmentVelHeur);
+        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("Invalid travel segment (%i), try and get another\n        m_currentSplineTime: %f"),
+            m_SplineState.CurrentTraversalSegment, m_SplineState.Time);
 
-        float residualTime = FMath::Max(0.0f, m_SplineState.Time - 1.0f);
-        if ((residualTime > 0.0f) && (m_SplineState.IsValidSegment()))
-        {
-            FVector splinePoint = USDZ_KBSpline::SampleExplicit(m_SplineState, 1.0f);
-            residualDistance = (splinePoint - m_Character->GetActorLocation());
-            expectedMovement -= residualDistance;
-
-            // refine expec
-            //currentSplineTime -= residualTime;
-            //FMath::Max(0.0f, currentSplineTime);
-        }
+        //float residualTime = FMath::Max(0.0f, m_SplineState.Time - 1.0f);
+        //if ((residualTime > 0.0f) && (m_SplineState.IsValidSegment()))
+        //{
+        //    //FVector splinePoint = USDZ_KBSpline::SampleExplicit(m_SplineState, 1.0f);
+        //    residualDistance = (m_SplineState.WorkingSet[FKBSplineState::ToPoint].Location - m_Character->GetActorLocation());
+        //    //expectedMovement -= residualDistance;
+        //}
         
         int proposedSegment = m_SplineConfig->GetNextCandidateSegment(m_SplineState.CurrentTraversalSegment);
         if (m_SplineConfig->IsValidSegment(proposedSegment))
@@ -232,22 +237,32 @@ void USDZ_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
                 m_SegmentChordDir /= m_CurrentSegLen;
             }
 
-            m_SegmentVelHeur = FMath::Max(m_CurrentSegLen / targetTime, Speed);
+            //m_SegmentVelHeur = FMath::Max(m_CurrentSegLen / targetTime, Speed);
+
+            candidateTime = m_SegmentChordDir.Dot((m_Character->GetActorLocation() - m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location) + expectedMovement) / m_CurrentSegLen;
+            m_SplineState.Time = FMath::Max(0.0f,candidateTime);
+            //m_SplineState.Time = 0.0f;
 
 
-            currentSplineTime = FMath::Max(quantumUpdate, m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
+            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("    ====\n              proposedSegment: %i\n              m_SplineState.Time: %f\n              m_SegmentChordDir: %s\n              m_CurrentSegLen: %f"),
+                proposedSegment, m_SplineState.Time,
+                *m_SegmentChordDir.ToString(), m_CurrentSegLen
+                );
 
-            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("Itteration: %i\n        m_currentSplineTime: %f\n        m_SegmentVelHeur: %f\n        expectedMovement: %s\n        Segment Chord: %s\n        Segment Length: %f"),
-                i, currentSplineTime, m_SegmentVelHeur,
-                *expectedMovement.ToString(),
-                *(m_SegmentChordDir * m_CurrentSegLen).ToString(), m_CurrentSegLen);
+            //currentSplineTime = FMath::Max(quantumUpdate, m_SegmentChordDir.Dot(expectedMovement)) / m_CurrentSegLen;
 
-            m_ValidSpline = currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
+            //UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("Itteration: %i\n        m_currentSplineTime: %f\n        m_SegmentVelHeur: %f\n        expectedMovement: %s\n        Segment Chord: %s\n        Segment Length: %f"),
+            //    i, currentSplineTime, m_SegmentVelHeur,
+            //    *expectedMovement.ToString(),
+            //    *(m_SegmentChordDir * m_CurrentSegLen).ToString(), m_CurrentSegLen);
+
+            //m_ValidSpline = currentSplineTime < 1.0f && m_SegmentVelHeur > 0.0f;
+            validSpline = m_SplineState.IsValidSegment() && m_SplineState.Time < 1.0f && m_SplineState.Time >= 0.0f;
 
             // we want to consume a segment off of the control point buffer. Either the last segment we just completed or 
             // the new one which was too short to be travel
             int toConsume = proposedSegment;
-            if (m_ValidSpline)
+            if (validSpline)
             {
                 // we can consume our last segment
                 toConsume = m_LastValidSegment;
@@ -256,23 +271,61 @@ void USDZ_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
         }
     }
 
-    if (m_ValidSpline && DeltaT > 0.0f)
+    if (validSpline && DeltaT > 0.0f)
     {
         m_LastValidSegment = m_SplineState.CurrentTraversalSegment;
-        m_SplineState.Time = currentSplineTime;
+        //m_SplineState.Time = currentSplineTime;
 
-        //m_SplineState.Time = m_currentSplineTime;
         FVector splinePoint = USDZ_KBSpline::Sample(m_SplineState);
 
-
-        Velocity = (splinePoint - m_Character->GetActorLocation()) / (DeltaT);
-
+        Velocity = (splinePoint - m_Character->GetActorLocation()).GetSafeNormal() * m_Throttle;
 
         UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), 1.0f, FColor::Blue, TEXT("Loc"));
         UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, splinePoint, 1.0f, FColor::Red, TEXT("Spline"));
         UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("Updating Velocity\n        Velocity: %s\n         m_SplineState.Time: %f\n        Delta: %s"),
             *Velocity.ToString(), m_SplineState.Time,
             *(splinePoint - m_Character->GetActorLocation()).ToString() );
+
+
+
+
+
+
+
+
+
+        FVector SplinePoint = m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location;
+        FVector NormalizedPoint = m_Character->GetActorLocation() - SplinePoint;
+        FVector MovePoint = NormalizedPoint + expectedMovement;
+        float ProjectionPoint = m_SegmentChordDir.Dot(NormalizedPoint);
+        float ProjectedMove = m_SegmentChordDir.Dot(MovePoint);
+        float NormalizedMovePorjection = ProjectedMove / m_CurrentSegLen;
+        FVector SampleSource = SplinePoint + (m_SegmentChordDir * NormalizedMovePorjection * m_CurrentSegLen);
+
+        UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, SplinePoint, SampleSource, FColor::Orange, 6.0f, TEXT("Projection"));
+        UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, SampleSource, splinePoint, FColor::Black, 2.0f, TEXT(""));
+
+        //UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, SplinePoint, SplinePoint + (m_SegmentChordDir * ProjectionPoint), FColor::Orange, 3.0f, TEXT("Projection"));
+        UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), SplinePoint + (m_SegmentChordDir * ProjectionPoint), FColor::Black, 2.0f, TEXT(""));
+
+        // UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, SplinePoint + (m_SegmentChordDir * ProjectionPoint), SplinePoint + (m_SegmentChordDir * ProjectedMove), FColor::Red, 4.0f, TEXT("Move"));
+        UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation() + expectedMovement, SplinePoint + (m_SegmentChordDir * ProjectedMove), FColor::Black, 2.0f, TEXT(""));
+
+        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("============================================\n        Raw Projection: %f\n         Normalized Projection: %f\n         m_CurrentSegLen: %f\n============================================"),
+            ProjectionPoint, ProjectionPoint / m_CurrentSegLen, m_CurrentSegLen
+        );
+
+
+
+
+
+
+
+
+
+        UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), m_Character->GetActorLocation() + (Velocity * DeltaT), FColor::Red, TEXT(""));
+        UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation() + FVector(0, 0, -10), m_Character->GetActorLocation() + (Velocity * DeltaT) + FVector(0, 0, -10), FColor::Red, TEXT("Vel"));
+
     }
 }
 
@@ -286,10 +339,11 @@ void USDZ_SplineMovementComponent::ResetSplineState()
     USDZ_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation()  , MoveTensioning, MoveBias });
 
     m_SplineState.CurrentTraversalSegment = 0;
-    //m_currentSplineTime = 0.0f;
-    m_SegmentVelHeur = 0.0f;
+    m_CurrentMoveTarget = m_Character->GetActorLocation();
+
+    //m_SegmentVelHeur = 0.0f;
     m_CurrentSegLen = 1.0f;
-    m_NextPointTarget = m_Character->GetActorLocation();
+    //m_NextPointTarget = m_Character->GetActorLocation();
 }
 
 void USDZ_SplineMovementComponent::SetUseSpline(bool Value)
