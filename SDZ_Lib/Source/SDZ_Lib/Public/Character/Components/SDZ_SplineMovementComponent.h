@@ -37,14 +37,23 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General Movement")
 	float Speed = 0.0f;
 
-	virtual void SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode = 0) override;
 
-	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
+	/// <summary>
+	/// How wide is the rail that the character is trying to stay on, or how precisely the character attempts to follow the spline
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Following")
+	float RailWidth = 10.0f;
+
+	/// <summary>
+	/// Force Stay On Rail will ensure that the character does not step off of the spline. This may affect the speed that was set.
+	/// This is more extreme than a Rail Width of 0, which can still step off the spline since it maintains chosen speed. 
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Following")
+	bool bForceStayOnRail = false;
+
+
 
 	virtual void BeginPlay() override;
-
-	virtual void PerformMovement(float DeltaSeconds) override;
-	virtual void PhysWalking(float deltaTime, int32 Iterations) override;
 
 	virtual void ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds) override;
 	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const;
@@ -62,14 +71,13 @@ protected:
 
 private:
 
-	void HandleHitSomethign(const FVector& adjustedVel, FVector& location, FHitResult& hit, float deltaTime);
-
 	void UpdateSplinePoints(float DeltaT, const FVector& Input);
 
-	//void EvaluateNavigationSpline(float DeltaT, FVector& outInput);
 	void EvaluateNavigationSpline(float DeltaT);
-	void FOO_EvaluateNavigationSpline(float DeltaT);
 
+	void MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaT);
+
+	void DebugDrawEvaluateForVelocity(float DeltaT);
 
 	void ResetSplineState();
 
@@ -78,8 +86,6 @@ private:
 	UPROPERTY()
 	UKBSplineConfig* m_SplineConfig;
 	FKBSplineState m_SplineState;
-
-	//FVector m_NextPointTarget;
 
 	FVector m_CurrentMoveTarget;
 	FVector m_SegmentChordDir;
@@ -90,10 +96,8 @@ private:
 	float m_Throttle = 0.0f;
 
 	float m_HalfRespRate = 0.0f;
-
-	//float m_SegmentVelHeur = 0.0f;
+	float m_RotationResponseWeight = 0.9f;
 
 	bool m_SplineWalk = false;
-	//bool m_ValidSpline = false;
 
 };
