@@ -1,0 +1,14 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "d:\\unreal_proj\\awful_lib\\sdz_lib\\plugins\\awfulruntimespline\\source\\awfulruntimespline\\private\\awfulruntimespline.cpp",
+        "ProvidedModule": "",
+        "PCH": "d:\\unreal_proj\\awful_lib\\sdz_lib\\intermediate\\build\\win64\\x64\\sdz_libeditor\\development\\unrealed\\sharedpch.unrealed.cpp20.h.pch",
+        "Includes": [
+            "d:\\unreal_proj\\awful_lib\\sdz_lib\\plugins\\awfulruntimespline\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\awfulruntimespline\\definitions.awfulruntimespline.h",
+            "d:\\unreal_proj\\awful_lib\\sdz_lib\\plugins\\awfulruntimespline\\source\\awfulruntimespline\\public\\awfulruntimespline.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

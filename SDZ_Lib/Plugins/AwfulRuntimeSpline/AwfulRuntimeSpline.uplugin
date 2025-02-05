@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "AwfulRuntimeSpline",
+	"Description": "Dynamic and constrained splines for runtime movement control",
+	"Category": "Other",
+	"CreatedBy": "Strati D. Zerbinis",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "AwfulRuntimeSpline",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
