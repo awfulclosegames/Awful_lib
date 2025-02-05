@@ -5,3 +5,11 @@ SDZ_Lib/Intermediate
 SDZ_Lib/SDZ_Lib.sln
 SDZ_Lib/.vsconfig
 SDZ_Lib/Build
+Awful_Lib/.vs
+Awful_Lib/Backup
+Awful_Lib/Binaries
+Awful_Lib/Intermediate
+Awful_Lib/Saved
+*.sln
+Awful_Lib/.vsconfig
+Awful_Lib/UpgradeLog.htm
