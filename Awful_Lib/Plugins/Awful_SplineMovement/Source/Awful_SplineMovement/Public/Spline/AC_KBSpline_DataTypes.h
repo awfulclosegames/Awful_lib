@@ -11,15 +11,15 @@
 
 
 USTRUCT(BlueprintType)
-struct FKBSplinePoint
+struct AWFUL_SPLINEMOVEMENT_API FKBSplinePoint
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	FVector Location = { 0.0f, 0.0f, 0.0f };
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float Tau = -1.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float Beta = 0.0f;
 };
 
@@ -38,20 +38,20 @@ struct FKBAnchorPoint
 	//			A- I think probably not. Letting the constraints be different between consecuative segments at a junction
 	//				could be pretty useful and shouldn't cause any issues
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	FKBSplinePoint Point;
 
 	// this could be a radius instead. Assume tetragons for now
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	FVector MinBound = { 0.0f, 0.0f, 0.0f };
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	FVector MaxBound = { 0.0f, 0.0f, 0.0f };
 
 };
 
 
 USTRUCT(BlueprintType)
-struct FKBSplineBounds
+struct AWFUL_SPLINEMOVEMENT_API FKBSplineBounds
 {
 	GENERATED_BODY()
 
@@ -61,14 +61,14 @@ struct FKBSplineBounds
 		ToPoint = 1,
 	};
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	TArray<FKBAnchorPoint> Anchors;
 
 };
 
 // should this be a class instead of struct so I don't need to copy 36 bytes all the time?
 USTRUCT(BlueprintType)
-struct FKBSplineState
+struct AWFUL_SPLINEMOVEMENT_API FKBSplineState
 {
 	GENERATED_BODY()
 
@@ -82,20 +82,20 @@ struct FKBSplineState
 	};
 
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spline Movement")
 	int CurrentTraversalSegment = -1;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, EditFixedSize)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, EditFixedSize, Category = "Spline Movement")
 	TArray<FVector> PrecomputedCoefficients;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float Time = 0.0f;
 
 	UPROPERTY()
 	FKBSplinePoint WorkingSet[WorkingSetPointTypes::NumberOfPoints];
 
 	// this limited. Could reuse a negative time or other flag value instead. Should probably compact this structure when I get time
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Spline Movement")
 	bool Valid = false;
 
 	// ************************************************************************
@@ -122,25 +122,25 @@ struct FKBSplineState
 	bool IsValidSegment() const;
 
 };
-
+ 
 
 UCLASS(BlueprintType)
-class UKBSplineConfig : public UObject
+class AWFUL_SPLINEMOVEMENT_API UKBSplineConfig : public UObject
 {
 	GENERATED_BODY()
 public:
 
 	TRingBuffer<FKBSplinePoint> ControlPoints;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spline Movement")
 	TMap<int, FKBSplineBounds> SegmentBounds;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spline Movement")
 	FKBSplinePoint OriginPoint;
 
 	/** Distance from the head of the control points list that must be consumed before any new changes can take effect
 	*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Spline Movement")
 	int CommitPoint = 0;
 
 	UKBSplineConfig() : Super() {}

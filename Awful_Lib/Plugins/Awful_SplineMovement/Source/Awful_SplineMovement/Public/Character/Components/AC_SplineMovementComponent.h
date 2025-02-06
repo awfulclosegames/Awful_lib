@@ -10,15 +10,16 @@
 #include "AC_SplineMovementComponent.generated.h"
 
 
-class ASplineTestCharacter;
+class ACharacter;
 
 
 
 UCLASS()
-class AWFUL_LIB_API UAC_SplineMovementComponent : public UCharacterMovementComponent
+class AWFUL_SPLINEMOVEMENT_API UAC_SplineMovementComponent : public UCharacterMovementComponent
 {
 	GENERATED_BODY()
 public:
+	UAC_SplineMovementComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float ControlLookahead = 1.0f;
@@ -35,8 +36,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	bool bSplineWalk = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "General Movement")
-	float Speed = 0.0f;
 
 	/// <summary>
 	/// How wide is the rail that the character is trying to stay on, or how precisely the character attempts to follow the spline
@@ -82,7 +81,7 @@ private:
 
 	void ResetSplineState();
 
-	TObjectPtr<ASplineTestCharacter> m_Character;
+	TObjectPtr<ACharacter> m_Character;
 
 	UPROPERTY()
 	UKBSplineConfig* m_SplineConfig;
@@ -95,6 +94,7 @@ private:
 	float m_CurrentSegLen = 1.0f;
 
 	float m_Throttle = 0.0f;
+	float mLastRecordedSpeed = 0.0f;
 
 #if !UE_BUILD_SHIPPING
 	FVector m_DEBUG_PosAtStartOfUpdate;

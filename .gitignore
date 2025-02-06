@@ -10,6 +10,10 @@ Awful_Lib/Backup
 Awful_Lib/Binaries
 Awful_Lib/Intermediate
 Awful_Lib/Saved
+Awful_Lib/DerivedDataCache
 *.sln
 Awful_Lib/.vsconfig
 Awful_Lib/UpgradeLog.htm
+Awful_Lib/Plugins/Awful_SplineMovement/Binaries
+Awful_Lib/Plugins/Awful_SplineMovement/Intermediate
+Packaged/

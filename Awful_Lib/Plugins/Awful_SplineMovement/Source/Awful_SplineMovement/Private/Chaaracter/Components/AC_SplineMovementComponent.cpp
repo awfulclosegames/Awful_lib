@@ -6,21 +6,25 @@
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
 #include "VisualLogger/VisualLogger.h"
+#include "DrawDebugHelpers.h"
 
 #include "Spline/AC_KBSpline.h"
-
-#include "Character/SPlineTestCharacter.h"
 
 
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
-static TAutoConsoleVariable<bool> CVarAC_SplineMoveDebug(TEXT("sdz.SplineMovement.Debug"), true, TEXT("Enable/Disable debug visualization for the Point of interest system"));
+static TAutoConsoleVariable<bool> CVarAC_SplineMoveDebug(TEXT("Awful.SplineMovement.Debug"), true, TEXT("Enable/Disable debug visualization for the Point of interest system"));
 
+
+UAC_SplineMovementComponent::UAC_SplineMovementComponent(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
+{
+}
 
 void UAC_SplineMovementComponent::BeginPlay()
 {
     Super::BeginPlay();
-    m_Character = Cast<ASplineTestCharacter>(GetOwner());
+    m_Character = Cast<ACharacter>(GetOwner());
     ensure(IsValid(m_Character));
 
     m_SplineConfig = UAC_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse));
@@ -38,7 +42,7 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    Speed = Velocity.Length();
+    mLastRecordedSpeed = Velocity.Length();
 
     //if (Velocity.SquaredLength() > 0.0f)
     //{
@@ -139,7 +143,7 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
             if (m_SplineState.IsValidSegment())
             {
                 // try and update the point within the segment
-                float quantumUpdate = (DeltaT * 2.0f * Speed) / m_CurrentSegLen;
+                float quantumUpdate = (DeltaT * 2.0f * mLastRecordedSpeed) / m_CurrentSegLen;
 
                 float candidateTime = m_SegmentChordDir.Dot((m_Character->GetActorLocation() - m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location) + (momentumDir * expectedTravel)) / m_CurrentSegLen;
                 m_SplineState.Time = quantumUpdate + FMath::Max(m_SplineState.Time, candidateTime);

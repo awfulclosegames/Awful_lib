@@ -8,7 +8,7 @@ public class Awful_Lib : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "GameplayTags", "EnhancedInput" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "GameplayTags", "EnhancedInput", "Awful_SplineMovement" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 

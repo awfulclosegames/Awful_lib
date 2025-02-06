@@ -6,7 +6,7 @@
 #include "Misc/AssertionMacros.h"
 #include "AC_KBSpline_DataTypes.h"
 
-class KBSplineUtils
+class AWFUL_SPLINEMOVEMENT_API KBSplineUtils
 {
 public:
 
