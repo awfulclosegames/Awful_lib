@@ -13,7 +13,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
-static TAutoConsoleVariable<bool> CVarAC_SplineMoveDebug(TEXT("Awful.SplineMovement.Debug"), true, TEXT("Enable/Disable debug visualization for the Point of interest system"));
+static TAutoConsoleVariable<bool> CVarAC_SplineMoveDebug(TEXT("Awful.SplineMovement.Debug"), false, TEXT("Enable/Disable debug visualization for the Point of interest system"));
 
 
 UAC_SplineMovementComponent::UAC_SplineMovementComponent(const FObjectInitializer& ObjectInitializer)
@@ -44,17 +44,20 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
     mLastRecordedSpeed = Velocity.Length();
 
-    //if (Velocity.SquaredLength() > 0.0f)
-    //{
-    //    if (UpdatedComponent)
-    //    {
-    //        //FRotator DeltaRot = Velocity.GetSafeNormal().Rotation() - UpdatedComponent->GetComponentRotation();
-    //        //float YawLimit = RotationRate.Yaw * DeltaTime;
-    //        //DeltaRot.Yaw = FMath::Clamp(DeltaRot.Yaw, -YawLimit, YawLimit);
-    //        //MoveUpdatedComponent(FVector::ZeroVector, UpdatedComponent->GetComponentRotation() + DeltaRot, /*bSweep*/ false);
-    //        MoveUpdatedComponent(FVector::ZeroVector, Velocity.GetSafeNormal().Rotation(), /*bSweep*/ false);
-    //    }
-    //}
+    if (Velocity.SquaredLength() > 0.0f)
+    {
+        if (UpdatedComponent)
+        {
+            //FRotator DeltaRot = Velocity.GetSafeNormal().Rotation() - UpdatedComponent->GetComponentRotation();
+            //float YawLimit = RotationRate.Yaw * DeltaTime;
+            //DeltaRot.Yaw = FMath::Clamp(DeltaRot.Yaw, -YawLimit, YawLimit);
+            //MoveUpdatedComponent(FVector::ZeroVector, UpdatedComponent->GetComponentRotation() + DeltaRot, /*bSweep*/ false);
+
+            auto tickRotation = FMath::Lerp(Velocity.GetSafeNormal().Rotation(), UpdatedComponent->GetComponentRotation(), 0.55f);
+            MoveUpdatedComponent(FVector::ZeroVector, tickRotation, /*bSweep*/ false);
+            //MoveUpdatedComponent(FVector::ZeroVector, Velocity.GetSafeNormal().Rotation(), /*bSweep*/ false);
+        }
+    }
 
 #if !UE_BUILD_SHIPPING
     if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
@@ -235,7 +238,10 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
 
         if (DeltaT > 0.0f)
         {
-            Acceleration = ((TargetOffset.GetSafeNormal() * m_Throttle) - Velocity) / DeltaT;
+            const float MaxInputSpeed = FMath::Max(GetMaxSpeed() * AnalogInputModifier, GetMinAnalogSpeed());
+            //const float MaxInputSpeed = FMath::Max(GetMaxSpeed(), GetMinAnalogSpeed());
+            Velocity = ((TargetOffset.GetSafeNormal() * m_Throttle)).GetClampedToMaxSize(MaxInputSpeed);
+//            Acceleration = ((TargetOffset.GetSafeNormal() * m_Throttle) - Velocity) / DeltaT;
         }
 
 #if !UE_BUILD_SHIPPING

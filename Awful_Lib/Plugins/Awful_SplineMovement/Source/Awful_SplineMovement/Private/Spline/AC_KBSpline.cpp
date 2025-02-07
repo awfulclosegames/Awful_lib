@@ -7,7 +7,7 @@
 #include "GameFramework/Actor.h"
 #include "DrawDebugHelpers.h"
 
-static TAutoConsoleVariable<bool> CVarAC_SplineDebug(TEXT("Awful.Spline.Debug"), true, TEXT("Enable/Disable debug visualization for the KB Spline"));
+static TAutoConsoleVariable<bool> CVarAC_SplineDebug(TEXT("Awful.Spline.Debug"), false, TEXT("Enable/Disable debug visualization for the KB Spline"));
 
 UKBSplineConfig* UAC_KBSpline::CreateSplineConfig(FVector Location)
 {
