@@ -16,14 +16,14 @@ UAC_TEST_SplineMovementComponent::UAC_TEST_SplineMovementComponent(const FObject
 
 void UAC_TEST_SplineMovementComponent::DecreaseResponse()
 {
-    MovementResponse *= 0.75f;
-
+    MaxMovementResponse *= 0.75f;
+    MinMovementResponse = MaxMovementResponse * 0.2;
 }
 
 
 void UAC_TEST_SplineMovementComponent::IncreaseResponse()
 {
-    MovementResponse /= 0.75f;
-
+    MaxMovementResponse /= 0.75f;
+    MinMovementResponse = MaxMovementResponse * 0.2;
 }
 

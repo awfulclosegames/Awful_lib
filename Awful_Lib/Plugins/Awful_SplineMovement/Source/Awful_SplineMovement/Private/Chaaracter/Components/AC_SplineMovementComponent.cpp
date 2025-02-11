@@ -27,16 +27,18 @@ void UAC_SplineMovementComponent::BeginPlay()
     m_Character = Cast<ACharacter>(GetOwner());
     ensure(IsValid(m_Character));
 
-    m_SplineConfig = UAC_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse));
+    m_CurrentResponseRate = MinMovementResponse;
+    m_SplineConfig = UAC_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_CurrentResponseRate));
 
     ResetSplineState();
 }
 
 void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
+    m_CurrentResponseRate = GetCurrentMovementReponseTime();
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    mLastRecordedSpeed = Velocity.Length();
+    m_LastRecordedSpeed = Velocity.Length();
 
 #if !UE_BUILD_SHIPPING
     if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
@@ -60,7 +62,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
         if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
         {
             FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
-            FVector MovementResponseTarget = input * GetMaxSpeed() * MovementResponse;
+            FVector MovementResponseTarget = input * GetMaxSpeed() * m_CurrentResponseRate;
             RequestedTarget.Z = 0.0f;
             MovementResponseTarget.Z = 0.0f;
             DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + RequestedTarget, 5.0f, 8, FColor::Black, false);
@@ -84,9 +86,16 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, const FVector& Input)
 {
     FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
-    nextPointTarget += (Input * GetMaxSpeed() * MovementResponse);
+    nextPointTarget += (Input * GetMaxSpeed() * m_CurrentResponseRate);
     nextPointTarget.Z = m_Character->GetActorLocation().Z;
     return nextPointTarget;
+}
+
+float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
+{
+    float effectiveMax = MaxMovementResponse - MinMovementResponse;
+    float scale = Velocity.SquaredLength() / FMath::Square(GetMaxSpeed());
+    return MinMovementResponse + scale * effectiveMax;
 }
 
 void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector& Input)
@@ -122,7 +131,7 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
             if (m_SplineState.IsValidSegment())
             {
                 // try and update the point within the segment
-                float quantumUpdate = (DeltaT * 2.0f * mLastRecordedSpeed) / m_CurrentSegLen;
+                float quantumUpdate = (DeltaT * 2.0f * m_LastRecordedSpeed) / m_CurrentSegLen;
 
                 float candidateTime = m_SegmentChordDir.Dot((m_Character->GetActorLocation() - m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location) + (momentumDir * expectedTravel)) / m_CurrentSegLen;
                 m_SplineState.Time = quantumUpdate + FMath::Max(m_SplineState.Time, candidateTime);
@@ -231,7 +240,7 @@ void UAC_SplineMovementComponent::ResetSplineState()
 {
     UAC_KBSpline::Reset(m_SplineConfig);
 
-    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) , MoveTensioning, MoveBias });
+    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_CurrentResponseRate) , MoveTensioning, MoveBias });
     UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation()  , MoveTensioning, MoveBias });
 
     m_SplineState.CurrentTraversalSegment = 0;

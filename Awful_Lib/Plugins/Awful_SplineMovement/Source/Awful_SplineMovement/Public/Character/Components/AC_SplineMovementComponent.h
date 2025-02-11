@@ -24,8 +24,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float ControlLookahead = 1.0f;
 
+	/// <summary>
+	/// Movement response is how long (in seconds) it takes the character to start trying to follow new input. 
+	/// By default it scales based on velocity so that it takes longer to respond when moving faster 
+	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
-	float MovementResponse = 0.5f;
+	float MinMovementResponse = 0.1f;
+
+	/// <summary>
+	/// Movement response is how long (in seconds) it takes the character to start trying to follow new input. 
+	/// By default it scales based on velocity so that it takes longer to respond when moving faster 
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	float MaxMovementResponse = 0.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float MoveBias = 0.0f;
@@ -69,6 +80,7 @@ public:
 protected:
 	// Adding a new point into the control point stream. virtual so derived classes can provide whatever point generating logic they like
 	virtual FVector GenerateNewSplinePoint(float DeltaT, const FVector& Input);
+	virtual float GetCurrentMovementReponseTime() const;
 
 private:
 
@@ -95,7 +107,9 @@ private:
 	float m_CurrentSegLen = 1.0f;
 
 	float m_Throttle = 0.0f;
-	float mLastRecordedSpeed = 0.0f;
+	float m_LastRecordedSpeed = 0.0f;
+
+	float m_CurrentResponseRate = 0.0f;
 
 #if !UE_BUILD_SHIPPING
 	FVector m_DEBUG_PosAtStartOfUpdate;
