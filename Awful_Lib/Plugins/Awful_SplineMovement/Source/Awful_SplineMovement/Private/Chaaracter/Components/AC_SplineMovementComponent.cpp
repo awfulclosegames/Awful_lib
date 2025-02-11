@@ -133,9 +133,11 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
     FVector momentumDir = Velocity.GetSafeNormal();
     float expectedTravel = m_Throttle * DeltaT;
     FVector targetOffset = m_CurrentMoveTarget - m_Character->GetActorLocation();
+    float projectedMomentum = targetOffset.Dot(momentumDir);
+    float chordNormalizedExpectedTravel = m_SegmentChordDir.Dot(momentumDir) * expectedTravel;
 
     // if we're too close, then try and update the point on the spline that we are following
-    if (targetOffset.Dot(momentumDir) < expectedTravel)
+    if (projectedMomentum < chordNormalizedExpectedTravel)
     {
         m_CurrentMoveTarget = m_Character->GetActorLocation();
         targetOffset = FVector::ZeroVector;
@@ -153,10 +155,12 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
 
                 FVector candidateTarget = UAC_KBSpline::Sample(m_SplineState);
                 FVector candidateOfset = candidateTarget - m_Character->GetActorLocation();
+                
+                projectedMomentum = candidateOfset.Dot(momentumDir);
 
-                if (m_SplineState.Time <= 1.0f && candidateOfset.Dot(momentumDir) > expectedTravel)
+                if (m_SplineState.Time <= 1.0f && projectedMomentum > chordNormalizedExpectedTravel)
                 {
-                    m_CurrentMoveTarget = candidateTarget;
+                    m_CurrentMoveTarget =  candidateTarget;
                     targetOffset = candidateOfset;
                     break;
                 }
@@ -167,7 +171,6 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
                 int proposedSegment = m_SplineConfig->GetNextCandidateSegment(m_SplineState.CurrentTraversalSegment);
   
                 m_SplineState = UAC_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
-
                 UAC_KBSpline::GetChord(m_SplineConfig, proposedSegment, m_SegmentChordDir);
                 m_CurrentSegLen = m_SegmentChordDir.Length();
                 if (m_CurrentSegLen > 0.0f)
