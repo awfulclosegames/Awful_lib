@@ -31,6 +31,9 @@ public:
 	float MoveBias = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	float RotationBlendRate = 0.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float MoveTensioning = -1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
@@ -51,7 +54,6 @@ public:
 	bool bForceStayOnRail = false;
 
 
-
 	virtual void BeginPlay() override;
 
 	virtual void ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds) override;
@@ -59,27 +61,25 @@ public:
 	void SetUseSpline(bool Value);
 	bool GetUseSpline()const { return bSplineWalk; }
 
-	void IncreaseResponse();
-	void DecreaseResponse();
 
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-	virtual void CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration) override;
 	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const override;
 	virtual void ApplyAccumulatedForces(float DeltaSeconds) override;
 
 protected:
+	// Adding a new point into the control point stream. virtual so derived classes can provide whatever point generating logic they like
+	virtual FVector GenerateNewSplinePoint(float DeltaT, const FVector& Input);
 
 private:
 
 	void UpdateSplinePoints(float DeltaT, const FVector& Input);
-
 	void EvaluateNavigationSpline(float DeltaT);
 
 	void MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaT);
+	void ResetSplineState();
 
 	void DebugDrawEvaluateForVelocity(float DeltaT);
 
-	void ResetSplineState();
 
 	TObjectPtr<ACharacter> m_Character;
 
@@ -90,6 +90,7 @@ private:
 	FVector m_CurrentMoveTarget;
 	FVector m_SegmentChordDir;
 
+	FRotator m_DesiredRotation;
 	int m_LastValidSegment = 0;
 	float m_CurrentSegLen = 1.0f;
 

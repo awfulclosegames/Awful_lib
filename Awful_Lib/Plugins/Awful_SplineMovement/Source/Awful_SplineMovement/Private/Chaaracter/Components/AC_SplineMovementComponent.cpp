@@ -32,32 +32,11 @@ void UAC_SplineMovementComponent::BeginPlay()
     ResetSplineState();
 }
 
-void UAC_SplineMovementComponent::DecreaseResponse()
-{
-    MovementResponse *= 0.75f;
-
-}
-
 void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
     mLastRecordedSpeed = Velocity.Length();
-
-    if (Velocity.SquaredLength() > 0.0f)
-    {
-        if (UpdatedComponent)
-        {
-            //FRotator DeltaRot = Velocity.GetSafeNormal().Rotation() - UpdatedComponent->GetComponentRotation();
-            //float YawLimit = RotationRate.Yaw * DeltaTime;
-            //DeltaRot.Yaw = FMath::Clamp(DeltaRot.Yaw, -YawLimit, YawLimit);
-            //MoveUpdatedComponent(FVector::ZeroVector, UpdatedComponent->GetComponentRotation() + DeltaRot, /*bSweep*/ false);
-
-            auto tickRotation = FMath::Lerp(Velocity.GetSafeNormal().Rotation(), UpdatedComponent->GetComponentRotation(), 0.55f);
-            MoveUpdatedComponent(FVector::ZeroVector, tickRotation, /*bSweep*/ false);
-            //MoveUpdatedComponent(FVector::ZeroVector, Velocity.GetSafeNormal().Rotation(), /*bSweep*/ false);
-        }
-    }
 
 #if !UE_BUILD_SHIPPING
     if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
@@ -67,12 +46,6 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 #endif
 }
 
-void UAC_SplineMovementComponent::IncreaseResponse()
-{
-    MovementResponse /= 0.75f;
-
-}
-
 void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds)
 {
     FVector input = InputVector.GetClampedToMaxSize(1.0f);
@@ -80,14 +53,14 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 
     if (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER)
     {
+        m_Throttle = input.Length() * GetMaxSpeed();
         UpdateSplinePoints(DeltaSeconds, input);
-
-        FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
-        FVector MovementResponseTarget = input * GetMaxSpeed() * MovementResponse;
 
 #if !UE_BUILD_SHIPPING
         if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
         {
+            FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
+            FVector MovementResponseTarget = input * GetMaxSpeed() * MovementResponse;
             RequestedTarget.Z = 0.0f;
             MovementResponseTarget.Z = 0.0f;
             DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + RequestedTarget, 5.0f, 8, FColor::Black, false);
@@ -108,19 +81,20 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
     Super::ControlledCharacterMove(input, DeltaSeconds);
 }
 
+FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, const FVector& Input)
+{
+    FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
+    nextPointTarget += (Input * GetMaxSpeed() * MovementResponse);
+    nextPointTarget.Z = m_Character->GetActorLocation().Z;
+    return nextPointTarget;
+}
+
 void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector& Input)
 {
-    FVector DrivenInput = Input;
-    m_Throttle = DrivenInput.Length() * GetMaxSpeed();
-    float targetTime = MovementResponse;
-    DrivenInput.Z = 0.0f;
     m_SplineConfig->CommitPoint = 3;
-
     m_SplineConfig->ClearToCommitments();
 
-    FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
-    nextPointTarget += (DrivenInput * GetMaxSpeed() * targetTime);
-    nextPointTarget.Z = m_Character->GetActorLocation().Z;
+    FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, Input);
     UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
 }
 
@@ -242,9 +216,7 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         if (DeltaT > 0.0f)
         {
             const float MaxInputSpeed = FMath::Max(GetMaxSpeed() * AnalogInputModifier, GetMinAnalogSpeed());
-            //const float MaxInputSpeed = FMath::Max(GetMaxSpeed(), GetMinAnalogSpeed());
             Velocity = ((TargetOffset.GetSafeNormal() * m_Throttle)).GetClampedToMaxSize(MaxInputSpeed);
-//            Acceleration = ((TargetOffset.GetSafeNormal() * m_Throttle) - Velocity) / DeltaT;
         }
 
 #if !UE_BUILD_SHIPPING
@@ -252,6 +224,20 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         m_DEBUG_ComputedAcceleration = Acceleration;
 #endif
     }
+}
+
+
+void UAC_SplineMovementComponent::ResetSplineState()
+{
+    UAC_KBSpline::Reset(m_SplineConfig);
+
+    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) , MoveTensioning, MoveBias });
+    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation()  , MoveTensioning, MoveBias });
+
+    m_SplineState.CurrentTraversalSegment = 0;
+    m_CurrentMoveTarget = m_Character->GetActorLocation();
+
+    m_CurrentSegLen = 1.0f;
 }
 
 
@@ -286,20 +272,6 @@ void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
 }
 
 
-
-void UAC_SplineMovementComponent::ResetSplineState()
-{
-    UAC_KBSpline::Reset(m_SplineConfig);
-
-    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MovementResponse) , MoveTensioning, MoveBias });
-    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation()  , MoveTensioning, MoveBias });
-
-    m_SplineState.CurrentTraversalSegment = 0;
-    m_CurrentMoveTarget = m_Character->GetActorLocation();
-
-    m_CurrentSegLen = 1.0f;
-}
-
 void UAC_SplineMovementComponent::SetUseSpline(bool Value)
 {
     bool prevValue = bSplineWalk;
@@ -311,20 +283,15 @@ void UAC_SplineMovementComponent::SetUseSpline(bool Value)
 }
 
 
-void UAC_SplineMovementComponent::CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration)
-{
-    //if (bSplineWalk)
-    //{
-    //    EvaluateNavigationSpline(DeltaTime);
-    //}
-
-    Super::CalcVelocity(DeltaTime, Friction, bFluid, BrakingDeceleration);
-}
-
 FRotator UAC_SplineMovementComponent::ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const
 {
-    return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
+    if (!bSplineWalk)
+    {
+        return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
+    }
 
+    auto nextRotation = FMath::Lerp(CurrentRotation, m_DesiredRotation, RotationBlendRate);
+    return nextRotation;
 }
 
 void UAC_SplineMovementComponent::ApplyAccumulatedForces(float DeltaSeconds)
@@ -334,6 +301,10 @@ void UAC_SplineMovementComponent::ApplyAccumulatedForces(float DeltaSeconds)
     if (bSplineWalk)
     {
         EvaluateNavigationSpline(DeltaSeconds);
+        if (m_SplineState.IsValidSegment())
+        {
+            m_DesiredRotation = Velocity.GetSafeNormal().Rotation();
+        }
     }
-
 }
+

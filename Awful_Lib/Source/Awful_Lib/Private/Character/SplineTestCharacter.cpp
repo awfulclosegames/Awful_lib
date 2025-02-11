@@ -9,14 +9,14 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-#include "Character/Components/AC_SplineMovementComponent.h"
+#include "Character/Components/AC_TEST_SplineMovementComponent.h"
 
 
 //////////////////////////////////////////////////////////////////////////
 // ASplineTestCharacter
 
 ASplineTestCharacter::ASplineTestCharacter(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer.SetDefaultSubobjectClass<UAC_SplineMovementComponent>(ACharacter::CharacterMovementComponentName))
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UAC_TEST_SplineMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	// Set size for collision capsule
 	//GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -166,7 +166,7 @@ void ASplineTestCharacter::DownBias()
 
 void ASplineTestCharacter::UpResp()
 {
-	if (auto movement = Cast<UAC_SplineMovementComponent>(GetCharacterMovement()))
+	if (auto movement = Cast<UAC_TEST_SplineMovementComponent>(GetCharacterMovement()))
 	{
 		movement->IncreaseResponse();
 	}
@@ -174,7 +174,7 @@ void ASplineTestCharacter::UpResp()
 
 void ASplineTestCharacter::DownResp()
 {
-	if (auto movement = Cast<UAC_SplineMovementComponent>(GetCharacterMovement()))
+	if (auto movement = Cast<UAC_TEST_SplineMovementComponent>(GetCharacterMovement()))
 	{
 		movement->DecreaseResponse();
 	}
