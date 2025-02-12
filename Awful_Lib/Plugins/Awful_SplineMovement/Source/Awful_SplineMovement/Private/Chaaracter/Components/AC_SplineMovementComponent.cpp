@@ -61,15 +61,15 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 #if !UE_BUILD_SHIPPING
         if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
         {
-            FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
-            FVector MovementResponseTarget = input * GetMaxSpeed() * m_CurrentResponseRate;
-            RequestedTarget.Z = 0.0f;
-            MovementResponseTarget.Z = 0.0f;
-            DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + RequestedTarget, 5.0f, 8, FColor::Black, false);
-            DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + MovementResponseTarget, 5.0f, 8, FColor::Orange, false);
-
             if (bSplineWalk)
             {
+                FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
+                FVector MovementResponseTarget = input * GetMaxSpeed() * m_CurrentResponseRate;
+                RequestedTarget.Z = 0.0f;
+                MovementResponseTarget.Z = 0.0f;
+                DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + RequestedTarget, 5.0f, 8, FColor::Black, false);
+                DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + MovementResponseTarget, 5.0f, 8, FColor::Orange, false);
+
                 UAC_KBSpline::DrawDebug(m_Character, m_SplineConfig, m_SplineState, FColor::Blue, 1.0f, 8.0f);
             }
         }
@@ -104,7 +104,11 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
     m_SplineConfig->ClearToCommitments();
 
     FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, Input);
-    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
+    // if we're within a rail width we aren't really needing to move, at least our move won't be reliable, since that's the margine of error
+    if ((nextPointTarget - m_Character->GetActorLocation()).SquaredLength() > FMath::Square( RailWidth))
+    {
+        UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
+    }
 }
 
 // This method tries to follow the spline by sampling a point and moving towards it until it's too close, then sampling a new one by updating the 
@@ -238,10 +242,19 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
 
 void UAC_SplineMovementComponent::ResetSplineState()
 {
+#if !UE_BUILD_SHIPPING
+    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("   Resetting Spline!"));
+#endif
+
     UAC_KBSpline::Reset(m_SplineConfig);
 
+    // seed the empty spline with our current facing. 
+    // NOTE:
+    //  1) we assume the current position has a bias of 1 since we want all curvature for aligning to the next travel direction to occur after our current location
+    //      since we're already here
+    //  2) we could better approximate the correction to our new travel vector by taking our current velocity (if non-zero) and only usying facing if stationary
     UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_CurrentResponseRate) , MoveTensioning, MoveBias });
-    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation()  , MoveTensioning, MoveBias });
+    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation()  , MoveTensioning, 1.0f });
 
     m_SplineState.CurrentTraversalSegment = 0;
     m_CurrentMoveTarget = m_Character->GetActorLocation();
@@ -255,8 +268,8 @@ void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
 {
 #if !UE_BUILD_SHIPPING
 
-    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("*****************************\n        Segment: %i\n        Commit: %i\n        m_CurrentMoveTarget: %s\n        targetOffset: %s\n         Current Time: %f\n*****************************"),
-        m_SplineState.CurrentTraversalSegment, m_SplineConfig->CommitPoint,
+    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("*****************************\n        TICK\n*****************************\n        Segment: %i (isValid: %s)\n        Commit: %i\n        m_CurrentMoveTarget: %s\n        targetOffset: %s\n         Current Time: %f\n*****************************"),
+        m_SplineState.CurrentTraversalSegment, (m_SplineConfig->IsValidSegment(m_SplineState.CurrentTraversalSegment) ? TEXT("True") : TEXT("False")), m_SplineConfig->CommitPoint,
         *m_CurrentMoveTarget.ToString(), *(m_CurrentMoveTarget - m_Character->GetActorLocation()).ToString(),
         m_SplineState.Time
     );

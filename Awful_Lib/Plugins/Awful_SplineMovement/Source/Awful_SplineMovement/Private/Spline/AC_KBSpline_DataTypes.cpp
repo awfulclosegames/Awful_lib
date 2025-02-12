@@ -94,6 +94,7 @@ void UKBSplineConfig::ClearToCommitments()
 void UKBSplineConfig::Reset()
 {
 	CommitPoint = 0;
+	++MinimumSegment;
 	ControlPoints.Reset();
 }
 
