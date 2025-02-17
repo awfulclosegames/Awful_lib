@@ -64,6 +64,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Following")
 	bool bForceStayOnRail = false;
 
+	/// <summary>
+	/// How much of a movement is requried to register for a new point, the effective deadzone of the input response (in Unreal Units)
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	float m_Tollerance = 5.0f;
 
 	virtual void BeginPlay() override;
 
@@ -96,7 +101,7 @@ private:
 	TObjectPtr<ACharacter> m_Character;
 
 	UPROPERTY()
-	UKBSplineConfig* m_SplineConfig;
+	TObjectPtr<UKBSplineConfig> m_SplineConfig;
 	FKBSplineState m_SplineState;
 
 	FVector m_CurrentMoveTarget;
@@ -110,6 +115,10 @@ private:
 	float m_LastRecordedSpeed = 0.0f;
 
 	float m_CurrentResponseRate = 0.0f;
+
+
+	FVector m_CachedDeflection = FVector{ 0.0f };
+	float m_TimeSinceLastDeflectionChange = 0.0f;
 
 #if !UE_BUILD_SHIPPING
 	FVector m_DEBUG_PosAtStartOfUpdate;

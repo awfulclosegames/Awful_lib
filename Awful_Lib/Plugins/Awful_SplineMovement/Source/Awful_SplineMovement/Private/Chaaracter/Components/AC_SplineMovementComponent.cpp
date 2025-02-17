@@ -52,12 +52,21 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 {
     FVector input = InputVector.GetClampedToMaxSize(1.0f);
     const float RequestedSpeedSquared = input.SizeSquared();
+    m_TimeSinceLastDeflectionChange += DeltaSeconds;
 
     if (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER)
     {
-        m_Throttle = input.Length() * GetMaxSpeed();
-        UpdateSplinePoints(DeltaSeconds, input);
+        if (((input - m_CachedDeflection) * GetMaxSpeed()).SquaredLength() > FMath::Square(m_Tollerance))
+        {
+            m_CachedDeflection = input;
+            // always assume we've at least taken one frame to respond
 
+            m_TimeSinceLastDeflectionChange = DeltaSeconds;
+            m_Throttle = m_CachedDeflection.Length() * GetMaxSpeed();
+        }
+        
+        UpdateSplinePoints(DeltaSeconds, m_CachedDeflection);
+        
 #if !UE_BUILD_SHIPPING
         if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
         {
@@ -79,6 +88,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
     {
         ResetSplineState();
     }
+            m_TimeSinceLastDeflectionChange += DeltaSeconds;
 
     Super::ControlledCharacterMove(input, DeltaSeconds);
 }
@@ -86,7 +96,9 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, const FVector& Input)
 {
     FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
-    nextPointTarget += (Input * GetMaxSpeed() * m_CurrentResponseRate);
+    float urgencyAdjustment = m_TimeSinceLastDeflectionChange / m_CurrentResponseRate;
+
+    nextPointTarget += (Input * GetMaxSpeed() * m_TimeSinceLastDeflectionChange);
     nextPointTarget.Z = m_Character->GetActorLocation().Z;
     return nextPointTarget;
 }
@@ -253,8 +265,8 @@ void UAC_SplineMovementComponent::ResetSplineState()
     //  1) we assume the current position has a bias of 1 since we want all curvature for aligning to the next travel direction to occur after our current location
     //      since we're already here
     //  2) we could better approximate the correction to our new travel vector by taking our current velocity (if non-zero) and only usying facing if stationary
-    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_CurrentResponseRate) , MoveTensioning, MoveBias });
-    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation()  , MoveTensioning, 1.0f });
+    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MaxMovementResponse) , MoveTensioning, MoveBias });
+    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation(), MoveTensioning, 1.0f });
 
     m_SplineState.CurrentTraversalSegment = 0;
     m_CurrentMoveTarget = m_Character->GetActorLocation();
