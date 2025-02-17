@@ -98,7 +98,7 @@ FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, const 
     FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
     float urgencyAdjustment = m_TimeSinceLastDeflectionChange / m_CurrentResponseRate;
 
-    nextPointTarget += (Input * GetMaxSpeed() * m_TimeSinceLastDeflectionChange);
+    nextPointTarget += (Input * GetMaxSpeed() * FMath::Clamp(m_TimeSinceLastDeflectionChange, MinMovementResponse, MaxMovementResponse));
     nextPointTarget.Z = m_Character->GetActorLocation().Z;
     return nextPointTarget;
 }
