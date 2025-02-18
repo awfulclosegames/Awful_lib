@@ -27,15 +27,13 @@ void UAC_SplineMovementComponent::BeginPlay()
     m_Character = Cast<ACharacter>(GetOwner());
     ensure(IsValid(m_Character));
 
-    m_CurrentResponseRate = MinMovementResponse;
-    m_SplineConfig = UAC_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * m_CurrentResponseRate));
+    m_SplineConfig = UAC_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MaxMovementResponse));
 
     ResetSplineState();
 }
 
 void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
-    m_CurrentResponseRate = GetCurrentMovementReponseTime();
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
     m_LastRecordedSpeed = Velocity.Length();
@@ -56,13 +54,29 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 
     if (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER)
     {
-        if (((input - m_CachedDeflection) * GetMaxSpeed()).SquaredLength() > FMath::Square(m_Tollerance))
+        float projectedDeflection = input.Dot(m_CachedDeflection) / RequestedSpeedSquared;
+        float deflectionFactor = FMath::Abs(1.0f - projectedDeflection);
+
+        UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), m_Character->GetActorLocation() + (input * 55.0f), FColor::Green, TEXT("input"));
+        UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), m_Character->GetActorLocation() + (m_CachedDeflection * 50.0f), FColor::Black, TEXT("Cached"));
+        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         deflectionFactor: %f\n                         RAW deflectionFactor: %f\n                         Threshold: %f\n                         m_CachedDeflection: %s\n                         input / %f : %s\n                         input: %s"),
+            deflectionFactor, (input ).Dot(m_CachedDeflection), (1.0f - ResponseTollerance),
+            *m_CachedDeflection.ToString(), FMath::Sqrt(RequestedSpeedSquared), *(input.GetSafeNormal()).ToString(), *input.ToString());
+
+        if (deflectionFactor > ResponseTollerance)
         {
             m_CachedDeflection = input;
-            // always assume we've at least taken one frame to respond
 
+            // How much of a deflection change (alignment error) are we accumulating normalized against our response threshold (deadzone)
+            // big number means really urgent we make this change, low number means less urgency
+            m_UrgencyFactor = 1.0f - (ResponseTollerance / deflectionFactor);
+
+            // not correct, this assumes that we want a default of max response... this should take urgency factor into account
             m_TimeSinceLastDeflectionChange = DeltaSeconds;
             m_Throttle = m_CachedDeflection.Length() * GetMaxSpeed();
+
+            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         m_TimeSinceLastDeflectionChange: %f\n                         m_UrgencyFactor: %f\n                         m_Throttle: %f"),
+                m_TimeSinceLastDeflectionChange, m_UrgencyFactor, m_Throttle);
         }
         
         UpdateSplinePoints(DeltaSeconds, m_CachedDeflection);
@@ -73,7 +87,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             if (bSplineWalk)
             {
                 FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
-                FVector MovementResponseTarget = input * GetMaxSpeed() * m_CurrentResponseRate;
+                FVector MovementResponseTarget = input * GetMaxSpeed() * GetCurrentMovementReponseTime();
                 RequestedTarget.Z = 0.0f;
                 MovementResponseTarget.Z = 0.0f;
                 DrawDebugSphere(GetWorld(), m_Character->GetActorLocation() + RequestedTarget, 5.0f, 8, FColor::Black, false);
@@ -88,7 +102,6 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
     {
         ResetSplineState();
     }
-            m_TimeSinceLastDeflectionChange += DeltaSeconds;
 
     Super::ControlledCharacterMove(input, DeltaSeconds);
 }
@@ -96,18 +109,15 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, const FVector& Input)
 {
     FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
-    float urgencyAdjustment = m_TimeSinceLastDeflectionChange / m_CurrentResponseRate;
 
-    nextPointTarget += (Input * GetMaxSpeed() * FMath::Clamp(m_TimeSinceLastDeflectionChange, MinMovementResponse, MaxMovementResponse));
+    nextPointTarget += Input * GetMaxSpeed() * GetCurrentMovementReponseTime();
     nextPointTarget.Z = m_Character->GetActorLocation().Z;
     return nextPointTarget;
 }
 
 float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
 {
-    float effectiveMax = MaxMovementResponse - MinMovementResponse;
-    float scale = Velocity.SquaredLength() / FMath::Square(GetMaxSpeed());
-    return MinMovementResponse + scale * effectiveMax;
+    return FMath::Clamp(m_TimeSinceLastDeflectionChange * (1.0f - m_UrgencyFactor), MinMovementResponse, MaxMovementResponse);
 }
 
 void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector& Input)

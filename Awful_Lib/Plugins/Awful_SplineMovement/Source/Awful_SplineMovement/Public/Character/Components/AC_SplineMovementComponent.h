@@ -24,20 +24,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float ControlLookahead = 1.0f;
 
-	/// <summary>
-	/// Movement response is how long (in seconds) it takes the character to start trying to follow new input. 
-	/// By default it scales based on velocity so that it takes longer to respond when moving faster 
-	/// </summary>
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
-	float MinMovementResponse = 0.1f;
-
-	/// <summary>
-	/// Movement response is how long (in seconds) it takes the character to start trying to follow new input. 
-	/// By default it scales based on velocity so that it takes longer to respond when moving faster 
-	/// </summary>
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
-	float MaxMovementResponse = 0.5f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	float MoveBias = 0.0f;
 
@@ -64,11 +50,27 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Following")
 	bool bForceStayOnRail = false;
 
+
 	/// <summary>
-	/// How much of a movement is requried to register for a new point, the effective deadzone of the input response (in Unreal Units)
+	/// Movement response is how long (in seconds) it takes the character to start trying to follow new input. 
+	/// By default it scales based on velocity so that it takes longer to respond when moving faster 
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
-	float m_Tollerance = 5.0f;
+	float MinMovementResponse = 0.1f;
+
+	/// <summary>
+	/// Movement response is how long (in seconds) it takes the character to start trying to follow new input. 
+	/// By default it scales based on velocity so that it takes longer to respond when moving faster 
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	float MaxMovementResponse = 0.5f;
+
+	/// <summary>
+	/// How much of a change of input is required to pick a new spline control point (dead zone). Range = 0..1
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	float ResponseTollerance = 0.01f;
+
 
 	virtual void BeginPlay() override;
 
@@ -113,9 +115,7 @@ private:
 
 	float m_Throttle = 0.0f;
 	float m_LastRecordedSpeed = 0.0f;
-
-	float m_CurrentResponseRate = 0.0f;
-
+	float m_UrgencyFactor = 0.0f;
 
 	FVector m_CachedDeflection = FVector{ 0.0f };
 	float m_TimeSinceLastDeflectionChange = 0.0f;
