@@ -57,26 +57,44 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
         float projectedDeflection = input.Dot(m_CachedDeflection) / RequestedSpeedSquared;
         float deflectionFactor = FMath::Abs(1.0f - projectedDeflection);
 
-        UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), m_Character->GetActorLocation() + (input * 55.0f), FColor::Green, TEXT("input"));
-        UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), m_Character->GetActorLocation() + (m_CachedDeflection * 50.0f), FColor::Black, TEXT("Cached"));
-        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         deflectionFactor: %f\n                         RAW deflectionFactor: %f\n                         Threshold: %f\n                         m_CachedDeflection: %s\n                         input / %f : %s\n                         input: %s"),
-            deflectionFactor, (input ).Dot(m_CachedDeflection), (1.0f - ResponseTollerance),
-            *m_CachedDeflection.ToString(), FMath::Sqrt(RequestedSpeedSquared), *(input.GetSafeNormal()).ToString(), *input.ToString());
+        //UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), m_Character->GetActorLocation() + (input * 55.0f), FColor::Green, TEXT("input"));
+        //UE_VLOG_SEGMENT(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation(), m_Character->GetActorLocation() + (m_CachedDeflection * 50.0f), FColor::Black, TEXT("Cached"));
+        //UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         deflectionFactor: %f\n                         TimeSinceLastDeflectionChange: %f\n                         RAW deflectionFactor: %f\n                         Threshold: %f\n                         m_CachedDeflection: %s\n                         input / %f : %s\n                         input: %s"),
+        //    deflectionFactor, m_TimeSinceLastDeflectionChange,(input ).Dot(m_CachedDeflection), (1.0f - ResponseTollerance),
+        //    *m_CachedDeflection.ToString(), FMath::Sqrt(RequestedSpeedSquared), *(input.GetSafeNormal()).ToString(), *input.ToString());
 
         if (deflectionFactor > ResponseTollerance)
         {
             m_CachedDeflection = input;
 
+            // Urghency is a blend of how big a deflection and how frequently are changes being made
             // How much of a deflection change (alignment error) are we accumulating normalized against our response threshold (deadzone)
+            // How long since the last active change (normalized against the maximum response delay)
             // big number means really urgent we make this change, low number means less urgency
-            m_UrgencyFactor = 1.0f - (ResponseTollerance / deflectionFactor);
+            float timeUrgency = 1.0f - FMath::Min(m_TimeSinceLastDeflectionChange / MaxMovementResponse, 1.0f);
+            //float deflectionUrgency = 1.0f - (ResponseTollerance / deflectionFactor);
+            float deflectionUrgency = FMath::Min(deflectionFactor / (1.0f - DeflectionWeight), 1.0f);
+            m_UrgencyFactor = (m_TimeUrgencyBlendFactor * timeUrgency) + ((1.0f - m_TimeUrgencyBlendFactor) * deflectionUrgency);
+           
+            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         m_TimeSinceLastDeflectionChange: %f\n                         m_UrgencyFactor: %f\n                         timeUrgency: %f\n                                                  %f / %f\n                         deflectionUrgency: %f\n                                                  %f / %f\n                         m_Throttle: %f"),
+                m_TimeSinceLastDeflectionChange, m_UrgencyFactor, timeUrgency, m_TimeSinceLastDeflectionChange, MaxMovementResponse,
+                deflectionUrgency, deflectionFactor , DeflectionWeight, 
+                m_Throttle);
 
             // not correct, this assumes that we want a default of max response... this should take urgency factor into account
             m_TimeSinceLastDeflectionChange = DeltaSeconds;
             m_Throttle = m_CachedDeflection.Length() * GetMaxSpeed();
 
-            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         m_TimeSinceLastDeflectionChange: %f\n                         m_UrgencyFactor: %f\n                         m_Throttle: %f"),
-                m_TimeSinceLastDeflectionChange, m_UrgencyFactor, m_Throttle);
+            if (m_UrgencyFactor > InterruptionUrgency)
+            {
+
+                m_TimeSinceLastDeflectionChange = LaunchForce;
+                // drop the urgency since we're immediatly switching tracks
+                m_UrgencyFactor = 0.0f;
+                ResetSplineState();
+
+                m_CurrentMoveTarget = m_Character->GetActorLocation() + (Velocity * DeltaSeconds);
+            }
         }
         
         UpdateSplinePoints(DeltaSeconds, m_CachedDeflection);
@@ -275,12 +293,13 @@ void UAC_SplineMovementComponent::ResetSplineState()
     //  1) we assume the current position has a bias of 1 since we want all curvature for aligning to the next travel direction to occur after our current location
     //      since we're already here
     //  2) we could better approximate the correction to our new travel vector by taking our current velocity (if non-zero) and only usying facing if stationary
-    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MaxMovementResponse) , MoveTensioning, MoveBias });
+    float launchScale = FMath::Max(GetMaxSpeed() * LaunchForce, m_LastRecordedSpeed * LaunchForce);
+
+    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * launchScale) , MoveTensioning, 1.0f});
     UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation(), MoveTensioning, 1.0f });
 
     m_SplineState.CurrentTraversalSegment = 0;
     m_CurrentMoveTarget = m_Character->GetActorLocation();
-
     m_CurrentSegLen = 1.0f;
 }
 

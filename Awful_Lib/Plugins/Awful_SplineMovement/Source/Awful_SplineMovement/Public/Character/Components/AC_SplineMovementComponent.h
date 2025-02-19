@@ -66,11 +66,31 @@ public:
 	float MaxMovementResponse = 0.5f;
 
 	/// <summary>
+	/// A factor applied to new movements (either starting from a stop, or interrupting a current movement)
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	float LaunchForce = 1.5f;
+
+
+
+	/// <summary>
 	/// How much of a change of input is required to pick a new spline control point (dead zone). Range = 0..1
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
 	float ResponseTollerance = 0.01f;
 
+	/// <summary>
+	/// A weighting factor for how much urgency do we derive from deflection. Range = 0..1, higher number is more urgency for a given deflection
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	float DeflectionWeight = 0.75f;
+
+
+	/// <summary>
+	/// How urgent a change needs to be to interrupt the current movement spline segment rather than waiting till we reach the end of the current curve. Range = 0..1
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	float InterruptionUrgency = 0.75f;
 
 	virtual void BeginPlay() override;
 
@@ -120,6 +140,7 @@ private:
 	FVector m_CachedDeflection = FVector{ 0.0f };
 	float m_TimeSinceLastDeflectionChange = 0.0f;
 
+	const float m_TimeUrgencyBlendFactor = 0.5f;
 #if !UE_BUILD_SHIPPING
 	FVector m_DEBUG_PosAtStartOfUpdate;
 	FVector m_DEBUG_ComputedVelocity;
