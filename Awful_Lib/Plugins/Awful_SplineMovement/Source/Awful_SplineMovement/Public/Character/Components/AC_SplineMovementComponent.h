@@ -35,6 +35,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	bool bSplineWalk = false;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	bool bForcePlanerOnly = true;
 
 
 	/// <summary>
@@ -106,7 +109,7 @@ public:
 
 protected:
 	// Adding a new point into the control point stream. virtual so derived classes can provide whatever point generating logic they like
-	virtual FVector GenerateNewSplinePoint(float DeltaT, const FVector& Input);
+	virtual FVector GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input);
 	virtual float GetCurrentMovementReponseTime() const;
 
 private:
@@ -115,9 +118,9 @@ private:
 	void EvaluateNavigationSpline(float DeltaT);
 
 	void MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaT);
-	void ResetSplineState();
+	void ResetSplineState(float DeltaSeconds = 0.0f);
 
-	void DebugDrawEvaluateForVelocity(float DeltaT);
+	void DebugDrawEvaluateForVelocity(float DeltaSeconds);
 
 
 	TObjectPtr<ACharacter> m_Character;

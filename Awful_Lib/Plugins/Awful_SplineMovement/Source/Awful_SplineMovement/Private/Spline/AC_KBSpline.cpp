@@ -81,6 +81,16 @@ FKBSplineState UAC_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int P
 	return FKBSplineState{};
 }
 
+FVector UAC_KBSpline::ComputeTangent(FKBSplineState State)
+{
+	// compute the first derivative of the curve to get the tangent
+	float TimeSquared = State.Time * State.Time;
+	FVector SamplePoint = State.PrecomputedCoefficients[0] * TimeSquared +
+		State.PrecomputedCoefficients[1] * State.Time +
+		State.PrecomputedCoefficients[2];
+	return SamplePoint;
+}
+
 // these sample operations are easily vectorizable and probably should be
 FVector UAC_KBSpline::Sample(FKBSplineState State)
 {

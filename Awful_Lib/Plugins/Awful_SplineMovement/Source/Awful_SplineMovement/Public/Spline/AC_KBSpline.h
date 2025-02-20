@@ -38,6 +38,9 @@ public:
 	static FKBSplineState PrepareForEvaluation(UKBSplineConfig* Config, int PointID = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
+	static FVector ComputeTangent(FKBSplineState State);
+
+	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
 	static FVector Sample(FKBSplineState State);
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")

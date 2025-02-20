@@ -13,7 +13,8 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
-static TAutoConsoleVariable<bool> CVarAC_SplineMoveDebug(TEXT("Awful.SplineMovement.Debug"), false, TEXT("Enable/Disable debug visualization for the Point of interest system"));
+static TAutoConsoleVariable<bool> CVarAC_SplineMoveDebug(TEXT("Awful.SplineMovement.Debug"), false, TEXT("Enable/Disable debug visualization for the Spline movement component"));
+static TAutoConsoleVariable<bool> CVarAC_SplineDetailedMoveDebug(TEXT("Awful.SplineDetailedMovement.Debug"), false, TEXT("Enable/Disable detailed visualization for the Spline movement component"));
 
 
 UAC_SplineMovementComponent::UAC_SplineMovementComponent(const FObjectInitializer& ObjectInitializer)
@@ -87,13 +88,10 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 
             if (m_UrgencyFactor > InterruptionUrgency)
             {
-
                 m_TimeSinceLastDeflectionChange = LaunchForce;
                 // drop the urgency since we're immediatly switching tracks
                 m_UrgencyFactor = 0.0f;
-                ResetSplineState();
-
-                m_CurrentMoveTarget = m_Character->GetActorLocation() + (Velocity * DeltaSeconds);
+                ResetSplineState(DeltaSeconds);
             }
         }
         
@@ -118,17 +116,17 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
     }
     else
     {
-        ResetSplineState();
+        ResetSplineState(DeltaSeconds);
     }
 
     Super::ControlledCharacterMove(input, DeltaSeconds);
 }
 
-FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, const FVector& Input)
+FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input)
 {
     FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
 
-    nextPointTarget += Input * GetMaxSpeed() * GetCurrentMovementReponseTime();
+    nextPointTarget += Input * GetMaxSpeed() * TargetTime;
     nextPointTarget.Z = m_Character->GetActorLocation().Z;
     return nextPointTarget;
 }
@@ -143,11 +141,18 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
     m_SplineConfig->CommitPoint = 3;
     m_SplineConfig->ClearToCommitments();
 
-    FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, Input);
+    float targetTime = GetCurrentMovementReponseTime();
+    FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, targetTime, Input);
     // if we're within a rail width we aren't really needing to move, at least our move won't be reliable, since that's the margine of error
     if ((nextPointTarget - m_Character->GetActorLocation()).SquaredLength() > FMath::Square( RailWidth))
     {
         UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
+        // can add additional look ahead points for managing things like Motion Matching here
+        if (targetTime < ControlLookahead)
+        {
+            nextPointTarget = GenerateNewSplinePoint(DeltaT, ControlLookahead - targetTime, Input);
+            UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
+        }
     }
 }
 
@@ -158,10 +163,15 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
 void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
 {
     FVector momentumDir = Velocity.GetSafeNormal();
-    float expectedTravel = m_Throttle * DeltaT;
     FVector targetOffset = m_CurrentMoveTarget - m_Character->GetActorLocation();
+    if (bForcePlanerOnly)
+    {
+        momentumDir.Z = 0.0f;
+        targetOffset.Z = 0.0f;
+    }
+
     float projectedMomentum = targetOffset.Dot(momentumDir);
-    float chordNormalizedExpectedTravel = m_SegmentChordDir.Dot(momentumDir) * expectedTravel;
+    float chordNormalizedExpectedTravel = m_SegmentChordDir.Dot(momentumDir) * (m_Throttle * DeltaT);
 
     // if we're too close, then try and update the point on the spline that we are following
     if (projectedMomentum < chordNormalizedExpectedTravel)
@@ -175,14 +185,23 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
             if (m_SplineState.IsValidSegment())
             {
                 // try and update the point within the segment
-                float quantumUpdate = (DeltaT * 2.0f * m_LastRecordedSpeed) / m_CurrentSegLen;
-
-                float candidateTime = m_SegmentChordDir.Dot((m_Character->GetActorLocation() - m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location) + (momentumDir * expectedTravel)) / m_CurrentSegLen;
-                m_SplineState.Time = quantumUpdate + FMath::Max(m_SplineState.Time, candidateTime);
+                float quantumUpdate = (DeltaT * m_LastRecordedSpeed) / m_CurrentSegLen;
+                              
+                // get the current position on the curve, get tangent here, and use that to estimate the next step along the curve. Then project that against 
+                // the chord and normalize to get the new update time (make sure it doesn't go backwards too)
+                FVector tangent = UAC_KBSpline::ComputeTangent(m_SplineState);
+                FVector normalizedExpectedStep = (m_CurrentMoveTarget - m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location) + (tangent * DeltaT);
+                float candidateTime = m_SegmentChordDir.Dot(normalizedExpectedStep) / m_CurrentSegLen;
+                m_SplineState.Time = FMath::Max(m_SplineState.Time + quantumUpdate, candidateTime);
 
                 FVector candidateTarget = UAC_KBSpline::Sample(m_SplineState);
                 FVector candidateOfset = candidateTarget - m_Character->GetActorLocation();
-                
+
+                // this part is hacky, should refactor this for a cleaner (and less branchy) flow for ignoring Z offsets
+                if (bForcePlanerOnly)
+                {
+                    candidateOfset.Z = 0.0f;
+                }
                 projectedMomentum = candidateOfset.Dot(momentumDir);
 
                 if (m_SplineState.Time <= 1.0f && projectedMomentum > chordNormalizedExpectedTravel)
@@ -280,7 +299,7 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
 }
 
 
-void UAC_SplineMovementComponent::ResetSplineState()
+void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
 {
 #if !UE_BUILD_SHIPPING
     UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("   Resetting Spline!"));
@@ -299,7 +318,7 @@ void UAC_SplineMovementComponent::ResetSplineState()
     UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation(), MoveTensioning, 1.0f });
 
     m_SplineState.CurrentTraversalSegment = 0;
-    m_CurrentMoveTarget = m_Character->GetActorLocation();
+    m_CurrentMoveTarget = m_Character->GetActorLocation() + (Velocity * DeltaSeconds);
     m_CurrentSegLen = 1.0f;
 }
 
@@ -331,6 +350,16 @@ void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
     UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), FColor::Purple, 3.0f, TEXT("Vel Step"));
     UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), 1.0f, FColor::Red, TEXT("Vel Step"));
 
+    if (CVarAC_SplineDetailedMoveDebug.GetValueOnAnyThread())
+    {
+        int lookaheadSegment = m_SplineState.CurrentTraversalSegment + 1;
+        if (m_SplineConfig->IsValidSegment(lookaheadSegment))
+        {
+            auto lookaheadState = UAC_KBSpline::PrepareForEvaluation(m_SplineConfig, lookaheadSegment);
+            UAC_KBSpline::DrawDebug(m_Character, m_SplineConfig, lookaheadState, FColor::Yellow, 1.0f, 1.0f);
+        }
+    }
+    
 #endif
 }
 
