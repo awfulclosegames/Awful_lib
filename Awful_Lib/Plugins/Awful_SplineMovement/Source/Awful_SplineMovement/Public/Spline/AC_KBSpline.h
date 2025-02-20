@@ -41,6 +41,9 @@ public:
 	static FVector ComputeTangent(FKBSplineState State);
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
+	static FVector ComputeTangentExplicit(FKBSplineState State, float Time);
+
+	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
 	static FVector Sample(FKBSplineState State);
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")

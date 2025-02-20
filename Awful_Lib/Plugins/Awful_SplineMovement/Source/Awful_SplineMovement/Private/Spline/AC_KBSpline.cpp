@@ -83,10 +83,15 @@ FKBSplineState UAC_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int P
 
 FVector UAC_KBSpline::ComputeTangent(FKBSplineState State)
 {
+	return ComputeTangentExplicit(State, State.Time);
+}
+
+FVector UAC_KBSpline::ComputeTangentExplicit(FKBSplineState State, float Time)
+{
 	// compute the first derivative of the curve to get the tangent
-	float TimeSquared = State.Time * State.Time;
-	FVector SamplePoint = State.PrecomputedCoefficients[0] * TimeSquared +
-		State.PrecomputedCoefficients[1] * State.Time +
+	float TimeSquared = Time * Time;
+	FVector SamplePoint = State.PrecomputedCoefficients[0] * 3.0f * TimeSquared +
+		State.PrecomputedCoefficients[1] * 2.0f * Time +
 		State.PrecomputedCoefficients[2];
 	return SamplePoint;
 }
@@ -95,25 +100,18 @@ FVector UAC_KBSpline::ComputeTangent(FKBSplineState State)
 FVector UAC_KBSpline::Sample(FKBSplineState State)
 {
 	// compute the linear combination of 
-
-	float TimeSquared = State.Time * State.Time;
-	float TimeQubed = TimeSquared * State.Time;
-	FVector SamplePoint = State.PrecomputedCoefficients[0] * TimeQubed +
-		State.PrecomputedCoefficients[1] * TimeSquared +
-		State.PrecomputedCoefficients[2] * State.Time +
-		State.PrecomputedCoefficients[3];
-	return SamplePoint;
+	return SampleExplicit(State, State.Time);
 }
 
-FVector UAC_KBSpline::SampleExplicit(FKBSplineState State, float Completion)
+FVector UAC_KBSpline::SampleExplicit(FKBSplineState State, float Time)
 {
 	// compute the linear combination of 
 
-	float TimeSquared = Completion * Completion;
-	float TimeQubed = TimeSquared * Completion;
+	float TimeSquared = Time * Time;
+	float TimeQubed = TimeSquared * Time;
 	FVector SamplePoint = State.PrecomputedCoefficients[0] * TimeQubed +
 		State.PrecomputedCoefficients[1] * TimeSquared +
-		State.PrecomputedCoefficients[2] * Completion +
+		State.PrecomputedCoefficients[2] * Time +
 		State.PrecomputedCoefficients[3];
 	return SamplePoint;
 }

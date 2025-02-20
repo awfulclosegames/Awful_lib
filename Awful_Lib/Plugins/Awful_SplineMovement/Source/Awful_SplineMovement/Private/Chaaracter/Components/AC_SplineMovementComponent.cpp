@@ -35,6 +35,12 @@ void UAC_SplineMovementComponent::BeginPlay()
 
 void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
+    bEnabledSplineUpdates = bSplineWalk;
+    if (bDisableWhenInAir)
+    {
+        bEnabledSplineUpdates = bEnabledSplineUpdates && !(MovementMode == MOVE_Falling || MovementMode == MOVE_Flying);
+    }
+
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
     m_LastRecordedSpeed = Velocity.Length();
@@ -53,7 +59,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
     const float RequestedSpeedSquared = input.SizeSquared();
     m_TimeSinceLastDeflectionChange += DeltaSeconds;
 
-    if (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER)
+    if (bEnabledSplineUpdates && (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER))
     {
         float projectedDeflection = input.Dot(m_CachedDeflection) / RequestedSpeedSquared;
         float deflectionFactor = FMath::Abs(1.0f - projectedDeflection);
@@ -352,11 +358,13 @@ void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
 
     if (CVarAC_SplineDetailedMoveDebug.GetValueOnAnyThread())
     {
-        int lookaheadSegment = m_SplineState.CurrentTraversalSegment + 1;
-        if (m_SplineConfig->IsValidSegment(lookaheadSegment))
+        auto lookaheadState = m_SplineState;
+        int lookaheadSegment = lookaheadState.CurrentTraversalSegment + 1;
+        while (m_SplineConfig->IsValidSegment(lookaheadSegment))
         {
-            auto lookaheadState = UAC_KBSpline::PrepareForEvaluation(m_SplineConfig, lookaheadSegment);
+            lookaheadState = UAC_KBSpline::PrepareForEvaluation(m_SplineConfig, lookaheadSegment);
             UAC_KBSpline::DrawDebug(m_Character, m_SplineConfig, lookaheadState, FColor::Yellow, 1.0f, 1.0f);
+            lookaheadSegment = lookaheadState.CurrentTraversalSegment + 1;
         }
     }
     
@@ -377,20 +385,21 @@ void UAC_SplineMovementComponent::SetUseSpline(bool Value)
 
 FRotator UAC_SplineMovementComponent::ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const
 {
-    if (!bSplineWalk)
+    if (bEnabledSplineUpdates)
     {
-        return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
+        auto nextRotation = FMath::Lerp(CurrentRotation, m_DesiredRotation, RotationBlendRate);
+        return nextRotation;
     }
 
-    auto nextRotation = FMath::Lerp(CurrentRotation, m_DesiredRotation, RotationBlendRate);
-    return nextRotation;
+    return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
+
 }
 
 void UAC_SplineMovementComponent::ApplyAccumulatedForces(float DeltaSeconds)
 {
     Super::ApplyAccumulatedForces(DeltaSeconds);
 
-    if (bSplineWalk)
+    if (bEnabledSplineUpdates)
     {
         EvaluateNavigationSpline(DeltaSeconds);
         if (m_SplineState.IsValidSegment())

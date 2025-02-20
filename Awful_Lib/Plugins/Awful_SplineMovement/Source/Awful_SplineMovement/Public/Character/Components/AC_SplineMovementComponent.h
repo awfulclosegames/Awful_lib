@@ -39,6 +39,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	bool bForcePlanerOnly = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	bool bDisableWhenInAir = true;
 
 	/// <summary>
 	/// How wide is the rail that the character is trying to stay on, or how precisely the character attempts to follow the spline
@@ -144,6 +146,8 @@ private:
 	float m_TimeSinceLastDeflectionChange = 0.0f;
 
 	const float m_TimeUrgencyBlendFactor = 0.5f;
+
+	bool bEnabledSplineUpdates = false;
 #if !UE_BUILD_SHIPPING
 	FVector m_DEBUG_PosAtStartOfUpdate;
 	FVector m_DEBUG_ComputedVelocity;
