@@ -44,7 +44,7 @@ void UKBSplineConfig::ConsumeSegment(int SegmentID)
 		{
 			ControlPoints.PopFront(normalizedID);
 		}
-		++MinimumSegment;
+		MinimumSegment = SegmentID;
 	}
 }
 

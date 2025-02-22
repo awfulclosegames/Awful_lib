@@ -35,7 +35,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	bool bSplineWalk = false;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	bool bForcePlanerOnly = true;
 
@@ -100,7 +100,7 @@ public:
 	virtual void BeginPlay() override;
 
 	virtual void ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds) override;
-	
+
 	void SetUseSpline(bool Value);
 	bool GetUseSpline()const { return bSplineWalk; }
 
@@ -118,6 +118,8 @@ private:
 
 	void UpdateSplinePoints(float DeltaT, const FVector& Input);
 	void EvaluateNavigationSpline(float DeltaT);
+	void StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outOffset);
+
 
 	void MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaT);
 	void ResetSplineState(float DeltaSeconds = 0.0f);
@@ -145,12 +147,15 @@ private:
 	FVector m_CachedDeflection = FVector{ 0.0f };
 	float m_TimeSinceLastDeflectionChange = 0.0f;
 
+	bool m_interrupted = false;
 	const float m_TimeUrgencyBlendFactor = 0.5f;
+	const float m_InterruptionUrgencyReductionFactor = 0.5f;
 
 	bool bEnabledSplineUpdates = false;
 #if !UE_BUILD_SHIPPING
 	FVector m_DEBUG_PosAtStartOfUpdate;
 	FVector m_DEBUG_ComputedVelocity;
 	FVector m_DEBUG_ComputedAcceleration;
+	int m_DEBUG_DrawnSegment = -1;
 #endif
 };
