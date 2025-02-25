@@ -58,31 +58,31 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 {
     FVector input = InputVector.GetClampedToMaxSize(1.0f);
     const float RequestedSpeedSquared = input.SizeSquared();
+
     m_TimeSinceLastDeflectionChange += DeltaSeconds;
 
     if (bEnabledSplineUpdates && (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER))
     {
-        float projectedDeflection = input.Dot(Velocity) / (RequestedSpeedSquared * m_LastRecordedSpeed);
-        float deflectionFactor = FMath::Abs(1.0f - projectedDeflection);
+        FVector deflectionDelta = (input * GetMaxSpeed()) - Velocity;
+        float deflectionSqDeltaV = deflectionDelta.SquaredLength();
 
-        if (deflectionFactor > ResponseTollerance)
+        if (deflectionSqDeltaV > FMath::Square(ResponseTollerance * GetMaxSpeed()))
         {
             m_CachedDeflection = input;
+            // pressure is based on kinetic energy which is 0.5f * mass * vel^2. Assume a constant mass and pressure is proportional to the square of velocity
+            // since the delta is computed from velocities it is already a square velocity... though in inconvenient units since energy is usually computed in m/s not cm/s
+            m_AccumulatedPressure += deflectionSqDeltaV;
 
-            // Urghency is a blend of how big a deflection and how frequently are changes being made
-            // How much of a deflection change (alignment error) are we accumulating normalized against our response threshold (deadzone)
-            // How long since the last active change (normalized against the maximum response delay)
-            // big number means really urgent we make this change, low number means less urgency
-            float timeUrgency = 1.0f - FMath::Min(m_TimeSinceLastDeflectionChange / MaxMovementResponse, 1.0f);
-            float deflectionUrgency = FMath::Min(deflectionFactor * DeflectionWeight, 1.0f);
+            // urgency based on accumulated energy, so more changes per second of greater delta v mean more urgency.
+            // normalized against the maximum possible delta V (from max speed in one direction to max speed in the opposite direction) and compensated for the accumulation
+            // and limited to 1..0
+            m_UrgencyFactor = m_AccumulatedPressure / (m_PressureDecayFactor * FMath::Square(2.0f * GetMaxSpeed()));
+            m_UrgencyFactor = FMath::Clamp(m_UrgencyFactor, 0.0f, 1.0f);
 
-            m_UrgencyFactor = (m_TimeUrgencyBlendFactor * timeUrgency) + ((1.0f - m_TimeUrgencyBlendFactor) * deflectionUrgency);
-
-            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         m_TimeSinceLastDeflectionChange: %f\n                         m_UrgencyFactor: %f\n                         timeUrgency: %f\n                                                  %f / %f\n                         deflectionUrgency: %f\n                                                  %f / %f\n                         m_Throttle: %f"),
-                m_TimeSinceLastDeflectionChange, m_UrgencyFactor, timeUrgency, m_TimeSinceLastDeflectionChange, MaxMovementResponse,
-                deflectionUrgency, deflectionFactor, DeflectionWeight,
-                m_Throttle);
-
+            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         m_TimeSinceLastDeflectionChange: %f\n                         m_AccumulatedPressure: %f\n                                                  current energy delta: %f\n                         m_UrgencyFactor: %f\n                         Previous Throttle: %f"),
+                m_TimeSinceLastDeflectionChange, 
+                m_AccumulatedPressure, deflectionSqDeltaV, 
+                m_UrgencyFactor, m_Throttle);
             // not correct, this assumes that we want a default of max response... this should take urgency factor into account
             m_TimeSinceLastDeflectionChange = DeltaSeconds;
             m_Throttle = m_CachedDeflection.Length() * GetMaxSpeed();
@@ -97,6 +97,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             }
         }
 
+        m_AccumulatedPressure *= m_PressureDecayFactor; // decay the pressure with time
         UpdateSplinePoints(DeltaSeconds, m_CachedDeflection);
 
 #if !UE_BUILD_SHIPPING
@@ -140,7 +141,8 @@ FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, float 
 
 float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
 {
-    return FMath::Clamp(m_TimeSinceLastDeflectionChange * (1.0f - m_UrgencyFactor), MinMovementResponse, MaxMovementResponse);
+    float safeRecovery = 1.0f / (RecoveryRate + UE_SMALL_NUMBER);
+    return FMath::Clamp(m_TimeSinceLastDeflectionChange * safeRecovery * (1.0f - m_UrgencyFactor), MinMovementResponse, MaxMovementResponse);
 }
 
 void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector& Input)
@@ -149,6 +151,7 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
     m_SplineConfig->ClearToCommitments();
 
     float targetTime = GetCurrentMovementReponseTime();
+
     FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, targetTime, Input);
     // if we're within a rail width we aren't really needing to move, at least our move won't be reliable, since that's the margine of error
     if ((nextPointTarget - m_Character->GetActorLocation()).SquaredLength() > FMath::Square(RailWidth))

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Spline/AC_KBSpline_DataTypes.h"
+#include "Containers/RingBuffer.h"
 
 
 #include "AC_SplineMovementComponent.generated.h"
@@ -60,14 +61,14 @@ public:
 	/// Movement response is how long (in seconds) it takes the character to start trying to follow new input. 
 	/// By default it scales based on velocity so that it takes longer to respond when moving faster 
 	/// </summary>
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
 	float MinMovementResponse = 0.1f;
 
 	/// <summary>
 	/// Movement response is how long (in seconds) it takes the character to start trying to follow new input. 
 	/// By default it scales based on velocity so that it takes longer to respond when moving faster 
 	/// </summary>
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
 	float MaxMovementResponse = 0.5f;
 
 	/// <summary>
@@ -81,21 +82,20 @@ public:
 	/// <summary>
 	/// How much of a change of input is required to pick a new spline control point (dead zone). Range = 0..1
 	/// </summary>
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
 	float ResponseTollerance = 0.01f;
-
-	/// <summary>
-	/// A weighting factor for how much urgency do we derive from deflection. Range = 0..1, higher number is more urgency for a given deflection
-	/// </summary>
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
-	float DeflectionWeight = 0.75f;
-
 
 	/// <summary>
 	/// How urgent a change needs to be to interrupt the current movement spline segment rather than waiting till we reach the end of the current curve. Range = 0..1
 	/// </summary>
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
 	float InterruptionUrgency = 0.75f;
+
+	/// <summary>
+	/// How fast the point insertion point returns to the Max response rate in seconds to fully recover
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
+	float RecoveryRate = 0.75f;
 
 	virtual void BeginPlay() override;
 
@@ -146,10 +146,11 @@ private:
 
 	FVector m_CachedDeflection = FVector{ 0.0f };
 	float m_TimeSinceLastDeflectionChange = 0.0f;
+	float m_AccumulatedPressure = 0.0f;
 
 	bool m_interrupted = false;
-	const float m_TimeUrgencyBlendFactor = 0.5f;
 	const float m_InterruptionUrgencyReductionFactor = 0.5f;
+	const float m_PressureDecayFactor = 0.75f;
 
 	bool bEnabledSplineUpdates = false;
 #if !UE_BUILD_SHIPPING
