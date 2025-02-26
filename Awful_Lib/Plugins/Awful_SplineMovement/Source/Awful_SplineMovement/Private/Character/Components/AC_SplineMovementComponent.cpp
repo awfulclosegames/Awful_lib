@@ -10,7 +10,6 @@
 
 #include "Spline/AC_KBSpline.h"
 
-
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
 static TAutoConsoleVariable<bool> CVarAC_SplineMoveDebug(TEXT("Awful.SplineMovement.Debug"), false, TEXT("Enable/Disable debug visualization for the Spline movement component"));
@@ -63,7 +62,8 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 
     if (bEnabledSplineUpdates && (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER))
     {
-        FVector deflectionDelta = (input * GetMaxSpeed()) - Velocity;
+        //FVector deflectionDelta = (input * GetMaxSpeed()) - Velocity;
+        FVector deflectionDelta = (input * GetMaxSpeed()) - (m_SegmentChordDir * m_LastRecordedSpeed);
         float deflectionSqDeltaV = deflectionDelta.SquaredLength();
 
         if (deflectionSqDeltaV > FMath::Square(ResponseTollerance * GetMaxSpeed()))
@@ -72,32 +72,28 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             // pressure is based on kinetic energy which is 0.5f * mass * vel^2. Assume a constant mass and pressure is proportional to the square of velocity
             // since the delta is computed from velocities it is already a square velocity... though in inconvenient units since energy is usually computed in m/s not cm/s
             m_AccumulatedPressure += deflectionSqDeltaV;
+            // normalized against the maximum possible delta V (from max speed in one direction to max speed in the opposite direction) and compensated for the accumulation
+            // We don't actually want to normalize against the full delta v range since the top end is rarely used and it throws off the urgency so we use 75% of it (the coverage)
+            m_AccumulatedNormalization += FMath::Square(m_MaxDeltaVMultiplier * GetMaxSpeed());
 
             // urgency based on accumulated energy, so more changes per second of greater delta v mean more urgency.
-            // normalized against the maximum possible delta V (from max speed in one direction to max speed in the opposite direction) and compensated for the accumulation
             // and limited to 1..0
-            m_UrgencyFactor = m_AccumulatedPressure / (m_PressureDecayFactor * FMath::Square(2.0f * GetMaxSpeed()));
-            m_UrgencyFactor = FMath::Clamp(m_UrgencyFactor, 0.0f, 1.0f);
+            m_UrgencyFactor = (m_AccumulatedPressure) / m_AccumulatedNormalization;
+            m_UrgencyFactor = FMath::Clamp(m_UrgencyFactor * UrgencyFactor, 0.0f, 1.0f);
 
-            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         m_TimeSinceLastDeflectionChange: %f\n                         m_AccumulatedPressure: %f\n                                                  current energy delta: %f\n                         m_UrgencyFactor: %f\n                         Previous Throttle: %f"),
+            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         m_TimeSinceLastDeflectionChange: %f\n                         m_AccumulatedPressure: %f\n                                                  m_AccumulatedNormalization: %f\n                                                  current energy delta: %f\n                         m_UrgencyFactor: %f\n                         Previous Throttle: %f"),
                 m_TimeSinceLastDeflectionChange, 
-                m_AccumulatedPressure, deflectionSqDeltaV, 
+                m_AccumulatedPressure, m_AccumulatedNormalization, deflectionSqDeltaV,
                 m_UrgencyFactor, m_Throttle);
-            // not correct, this assumes that we want a default of max response... this should take urgency factor into account
+
             m_TimeSinceLastDeflectionChange = DeltaSeconds;
             m_Throttle = m_CachedDeflection.Length() * GetMaxSpeed();
 
-            if (m_UrgencyFactor > InterruptionUrgency)
-            {
-                m_interrupted = true;
-                m_TimeSinceLastDeflectionChange = MaxMovementResponse * (m_LastRecordedSpeed / GetMaxSpeed());
-                // drop the urgency since we're immediatly switching tracks
-                m_UrgencyFactor *= m_InterruptionUrgencyReductionFactor;
-                ResetSplineState(DeltaSeconds);
-            }
+            HandleInterruption(input, DeltaSeconds);
         }
 
-        m_AccumulatedPressure *= m_PressureDecayFactor; // decay the pressure with time
+        m_AccumulatedPressure *= UrgencyStickiness; // decay the pressure with time
+        m_AccumulatedNormalization *= UrgencyStickiness;
         UpdateSplinePoints(DeltaSeconds, m_CachedDeflection);
 
 #if !UE_BUILD_SHIPPING
@@ -140,14 +136,58 @@ FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, float 
 }
 
 float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
+{  
+    return FMath::Clamp((MinMovementResponse + m_TimeSinceLastDeflectionChange) * (1.0f - m_UrgencyFactor), MinMovementResponse, MaxMovementResponse);
+}
+
+void UAC_SplineMovementComponent::HandleInterruption(FVector input, float DeltaSeconds)
 {
-    float safeRecovery = 1.0f / (RecoveryRate + UE_SMALL_NUMBER);
-    return FMath::Clamp(m_TimeSinceLastDeflectionChange * safeRecovery * (1.0f - m_UrgencyFactor), MinMovementResponse, MaxMovementResponse);
+    // if there's no urgency, than favour smoothness and stick to the standard response ranges
+    if ((m_UrgencyFactor > InterruptionUrgency))
+    {
+        // we know there is some urgency, the next question: is the current segment too long?
+        float timeToMoveTarget = (m_CurrentMoveTarget - m_Character->GetActorLocation()).Length() / m_LastRecordedSpeed;
+        float targetResponseTime = MinMovementResponse + ((MaxMovementResponse - MinMovementResponse) * (1.0f - m_UrgencyFactor));
+        float junctionSplineTime = m_SplineState.Time + FMath::Max(0.0f, ((targetResponseTime - timeToMoveTarget) * m_LastRecordedSpeed) / (m_CurrentSegLen + UE_SMALL_NUMBER) );
+        // estimate when we need to junction to the new movement request. Assume we can continue to respect the minimum movement response time
+
+        static constexpr float closeEnoughToTheEnd = 0.9f;
+        // interruptions can be jarring so add a bit of a fudge factor. If we ideally would junction at time 0.99 of the current segment then realistically we can
+        // wait till the end of the segment and try and transition normally
+        if (junctionSplineTime < closeEnoughToTheEnd)
+        {
+            FVector junctionPoint = UAC_KBSpline::SampleExplicit(m_SplineState, junctionSplineTime);
+
+            m_interrupted = true;
+            m_TimeSinceLastDeflectionChange = (LaunchForce * (m_LastRecordedSpeed / GetMaxSpeed()));
+
+            // drop the urgency since we're immediatly switching tracks
+            m_UrgencyFactor *= m_InterruptionUrgencyReductionFactor;
+            m_AccumulatedPressure *= m_InterruptionUrgencyReductionFactor;
+            m_AccumulatedNormalization *= m_InterruptionUrgencyReductionFactor;
+
+            ResetSplineState(DeltaSeconds);
+
+            float interruptionBias = FMath::Clamp((m_UrgencyFactor - InterruptionUrgency) / ((1.0f - InterruptionUrgency) + UE_SMALL_NUMBER), 0.0f, 1.0f);
+            UAC_KBSpline::AddSplinePoint(m_SplineConfig, { junctionPoint , MoveTensioning, interruptionBias });
+
+#if !UE_BUILD_SHIPPING
+            if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
+            {
+                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT(" Interrupting current spline segment!\n            moving off at junction point %s"), *junctionPoint.ToString());
+                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("            targetResponseTime %f"), 
+                    targetResponseTime);
+                
+                UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation() + (Velocity * targetResponseTime), 15.0f, FColor::White, TEXT("Interruption"));
+                UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, junctionPoint, 15.0f, FColor::Purple, TEXT("Junction (%f)"), interruptionBias);
+            }
+#endif
+        }
+    }
 }
 
 void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector& Input)
 {
-    m_SplineConfig->CommitPoint = 3;
     m_SplineConfig->ClearToCommitments();
 
     float targetTime = GetCurrentMovementReponseTime();
@@ -160,10 +200,14 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
         // can add additional look ahead points for managing things like Motion Matching here
         if (targetTime < ControlLookahead)
         {
-            nextPointTarget = GenerateNewSplinePoint(DeltaT, ControlLookahead - targetTime, Input);
+            float remainingLookAhead = ControlLookahead - targetTime;
+            FVector newMotion = Input * GetMaxSpeed() * 1.5f;
+            FVector lookaheadVector = (newMotion - Velocity).GetSafeNormal();
+            nextPointTarget = GenerateNewSplinePoint(DeltaT, remainingLookAhead, Input);
             UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
         }
     }
+    m_SplineConfig->CommitPoint = 3;
 }
 
 // This method tries to follow the spline by sampling a point and moving towards it until it's too close, then sampling a new one by updating the 
@@ -233,6 +277,10 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
 
 void UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outOffset)
 {
+    const FVector& fromPoint = m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location;
+    FVector currentMoveTarget = m_CurrentMoveTarget;
+    FVector currentOffset = outOffset;
+    float currentProjectedMomentum = outProjectedMomentum;
     // try and update the point within the segment
     float quantumUpdate = (DeltaT * m_LastRecordedSpeed) / m_CurrentSegLen;
     bool stillTrying = true;
@@ -240,28 +288,31 @@ void UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& 
     {
         // get the current position on the curve, get tangent here, and use that to estimate the next step along the curve. Then project that against 
         // the chord and normalize to get the new update time (make sure it doesn't go backwards too)
-        FVector tangent = UAC_KBSpline::ComputeTangent(m_SplineState);
-        FVector normalizedTargetPoint = m_CurrentMoveTarget - m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location;
-        FVector normalizedExpectedStep = normalizedTargetPoint + (tangent * DeltaT);
+        FVector tangent = UAC_KBSpline::ComputeTangent(m_SplineState);        
+        FVector normalizedTargetPoint = currentMoveTarget + (tangent * DeltaT) - fromPoint;
+        FVector normalizedExpectedStep = normalizedTargetPoint;
         float candidateTime = m_SegmentChordDir.Dot(normalizedExpectedStep) / m_CurrentSegLen;
         m_SplineState.Time = FMath::Max(m_SplineState.Time + quantumUpdate, candidateTime);
 
-        outTarge = UAC_KBSpline::Sample(m_SplineState);
-        outOffset = outTarge - m_Character->GetActorLocation();
+        currentMoveTarget = UAC_KBSpline::Sample(m_SplineState);
+        currentOffset = currentMoveTarget - m_Character->GetActorLocation();
 
         // this part is hacky, should refactor this for a cleaner (and less branchy) flow for ignoring Z offsets
         if (bForcePlanerOnly)
         {
-            outOffset.Z = 0.0f;
+            currentOffset.Z = 0.0f;
         }
-        outProjectedMomentum = outOffset.Dot(MomentumDir);
+        currentProjectedMomentum = currentOffset.Dot(MomentumDir);
 
-        float projectedPos = m_SegmentChordDir.Dot(m_Character->GetActorLocation() - m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location);
-        float targetProjPos = m_SegmentChordDir.Dot(normalizedTargetPoint);
+        float projectedPos = m_SegmentChordDir.Dot(m_Character->GetActorLocation() - fromPoint);
+        float targetProjPos = m_SegmentChordDir.Dot(currentMoveTarget - fromPoint);
 
         // Either the new rabbit point should be ahead of us or farther along the spline. If neither of these is true step again
-        stillTrying = (outProjectedMomentum < 0.0f) && (projectedPos > targetProjPos);
+        stillTrying = (currentProjectedMomentum < 0.0f) && (projectedPos > targetProjPos);
     }
+    outTarge = currentMoveTarget;
+    outOffset = currentOffset;
+    outProjectedMomentum = currentProjectedMomentum;
 }
 
 
@@ -332,9 +383,11 @@ void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
 {
 #if !UE_BUILD_SHIPPING
     UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("   Resetting Spline!"));
+    m_DEBUG_DrawnSegment = -1;
 #endif
 
     UAC_KBSpline::Reset(m_SplineConfig);
+    m_SplineState.Reset();
 
     // seed the empty spline with our current facing. 
     // NOTE:
@@ -343,12 +396,13 @@ void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
     //  2) we could better approximate the correction to our new travel vector by taking our current velocity (if non-zero) and only usying facing if stationary
     float launchScale = FMath::Max(GetMaxSpeed() * LaunchForce, m_LastRecordedSpeed * LaunchForce);
 
-    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * launchScale) , MoveTensioning, 1.0f });
+    UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * launchScale) , MoveTensioning, MoveBias });
     UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_Character->GetActorLocation(), MoveTensioning, 1.0f });
 
     m_SplineState.CurrentTraversalSegment = 0;
     m_CurrentMoveTarget = m_Character->GetActorLocation() + (Velocity * DeltaSeconds);
-    m_CurrentSegLen = 1.0f;
+    m_SegmentChordDir = m_Character->GetActorForwardVector();
+    m_CurrentSegLen = m_LastRecordedSpeed * DeltaSeconds;
 }
 
 

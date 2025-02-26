@@ -85,17 +85,30 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
 	float ResponseTollerance = 0.01f;
 
+
+	/// <summary>
+	/// An arbitrary factor to apply to urgency for tuning purposes
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
+	float UrgencyFactor = 1.0f;
+
 	/// <summary>
 	/// How urgent a change needs to be to interrupt the current movement spline segment rather than waiting till we reach the end of the current curve. Range = 0..1
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
 	float InterruptionUrgency = 0.75f;
 
+	///// <summary>
+	///// How fast the point insertion point returns to the Max response rate in seconds to fully recover
+	///// </summary>
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
+	//float RecoveryRate = 0.75f;
+
 	/// <summary>
-	/// How fast the point insertion point returns to the Max response rate in seconds to fully recover
+	/// How fast is urgency forgotten. Ranges from 0..1 zero being immediatly forget urgency, 1 being never forget urgency
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
-	float RecoveryRate = 0.75f;
+	float UrgencyStickiness = 0.5f;
 
 	virtual void BeginPlay() override;
 
@@ -115,6 +128,7 @@ protected:
 	virtual float GetCurrentMovementReponseTime() const;
 
 private:
+	void HandleInterruption(FVector input, float DeltaSeconds);
 
 	void UpdateSplinePoints(float DeltaT, const FVector& Input);
 	void EvaluateNavigationSpline(float DeltaT);
@@ -147,10 +161,11 @@ private:
 	FVector m_CachedDeflection = FVector{ 0.0f };
 	float m_TimeSinceLastDeflectionChange = 0.0f;
 	float m_AccumulatedPressure = 0.0f;
+	float m_AccumulatedNormalization = 0.0f;
 
 	bool m_interrupted = false;
 	const float m_InterruptionUrgencyReductionFactor = 0.5f;
-	const float m_PressureDecayFactor = 0.75f;
+	const float m_MaxDeltaVMultiplier = 1.5f; // 2.0 would be going from full speed one way to full speed 180 degrees. 75% of that is usually good
 
 	bool bEnabledSplineUpdates = false;
 #if !UE_BUILD_SHIPPING
