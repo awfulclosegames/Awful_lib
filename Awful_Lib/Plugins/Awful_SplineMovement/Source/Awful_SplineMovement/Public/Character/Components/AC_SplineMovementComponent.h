@@ -22,17 +22,46 @@ class AWFUL_SPLINEMOVEMENT_API UAC_SplineMovementComponent : public UCharacterMo
 public:
 	UAC_SplineMovementComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
 	float ControlLookahead = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	/// <summary>
+	/// How much do we anticipate curvature before a junction of segments, Range 1..-1
+	/// 1 is perform all movement after the segment transitions (enter the junction aligned to the chord) 
+	///         this ammounts to no aniticipation of the new movement direction
+	/// 0 is share curvature evenly between segments. DEFAULT VALUE. 
+	/// -1 is perform all curvature before the junction entry (so we enter the new segment aligned to it's chord
+	///         this ammounts to total anticipation
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
 	float MoveBias = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	/// <summary>
+	/// How quickly we align the rotation to the splines desired rotation
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
 	float RotationBlendRate = 0.25f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
+	/// <summary>
+	/// how tightly do we pull the spline in to the chord. Range is 1..-infinity
+	/// 1 is fully pulled in to the chord, moving in a straight line
+	/// 0 is natural curvature.
+	/// -1 is expanded curvature, softer pull towards the spline. DEFAULT VALUE
+	///     NOTE: you can make this value arbitrarily negative to get a wider travel of the spline
+	///           but extremely negative values can produce odd and unwanted effects
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
 	float MoveTensioning = -1.0f;
+
+	/// <summary>
+	/// How much do we continue the input movement in the lookahead. Essentially how much do we assume the input would 
+	/// continue to turn in the current direction in the future
+	/// Range 0..1
+	/// 0 is no extended curvature, assume we move in a striaght line towards the lookahead
+	/// 1 is assume each step of the look ahead has as much offset from the previous as the new movement has from the previous frame
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
+	float InputCurveContinuationFactor = 0.7;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	bool bSplineWalk = false;

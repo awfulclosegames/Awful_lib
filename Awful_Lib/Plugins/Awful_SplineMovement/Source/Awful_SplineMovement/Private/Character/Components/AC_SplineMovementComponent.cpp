@@ -143,7 +143,7 @@ float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
 void UAC_SplineMovementComponent::HandleInterruption(FVector input, float DeltaSeconds)
 {
     // if there's no urgency, than favour smoothness and stick to the standard response ranges
-    if ((m_UrgencyFactor > InterruptionUrgency))
+    if ((m_UrgencyFactor > InterruptionUrgency) && m_SplineState.IsValidSegment())
     {
         // we know there is some urgency, the next question: is the current segment too long?
         float timeToMoveTarget = (m_CurrentMoveTarget - m_Character->GetActorLocation()).Length() / m_LastRecordedSpeed;
@@ -197,13 +197,19 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
     if ((nextPointTarget - m_Character->GetActorLocation()).SquaredLength() > FMath::Square(RailWidth))
     {
         UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
-        // can add additional look ahead points for managing things like Motion Matching here
-        if (targetTime < ControlLookahead)
+
+        // can add additional look ahead points for managing things like Motion Matching here. Note still respect constraints
+        float maxLookahead = ControlLookahead - targetTime;
+        // the InputCurveContinuationFactor here is to give some contorl over how much we bias additional lookahead points in the direction of movement
+        FVector stepMotion = (Input * GetMaxSpeed() * (1.0f + InputCurveContinuationFactor)) - (InputCurveContinuationFactor * Velocity);
+        FVector lookaheadVector = (stepMotion).GetSafeNormal();
+
+        while (maxLookahead > 0.0f)
         {
-            float remainingLookAhead = ControlLookahead - targetTime;
-            FVector newMotion = Input * GetMaxSpeed() * 1.5f;
-            FVector lookaheadVector = (newMotion - Velocity).GetSafeNormal();
-            nextPointTarget = GenerateNewSplinePoint(DeltaT, remainingLookAhead, Input);
+            float lookaheadStep = (targetTime + MaxMovementResponse) * 0.5f;
+            lookaheadStep = FMath::Min(lookaheadStep, ControlLookahead);
+            maxLookahead -= lookaheadStep;
+            nextPointTarget = GenerateNewSplinePoint(DeltaT, lookaheadStep, lookaheadVector);
             UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
         }
     }
@@ -440,7 +446,7 @@ void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
         while (m_SplineConfig->IsValidSegment(lookaheadSegment))
         {
             lookaheadState = UAC_KBSpline::PrepareForEvaluation(m_SplineConfig, lookaheadSegment);
-            UAC_KBSpline::DrawDebug(m_Character, m_SplineConfig, lookaheadState, FColor::Yellow, 1.0f, 1.0f);
+            UAC_KBSpline::DrawDebug(m_Character, m_SplineConfig, lookaheadState, FColor::Yellow, 5.0f, 0.0f);
             lookaheadSegment = lookaheadState.CurrentTraversalSegment + 1;
         }
 
