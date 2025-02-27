@@ -15,7 +15,7 @@ class ACharacter;
 
 
 
-UCLASS()
+UCLASS(BlueprintType)
 class AWFUL_SPLINEMOVEMENT_API UAC_SplineMovementComponent : public UCharacterMovementComponent
 {
 	GENERATED_BODY()
