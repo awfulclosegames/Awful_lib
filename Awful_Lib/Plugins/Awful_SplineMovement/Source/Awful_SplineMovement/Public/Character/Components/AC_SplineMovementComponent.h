@@ -91,7 +91,7 @@ public:
 	/// By default it scales based on velocity so that it takes longer to respond when moving faster 
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
-	float MinMovementResponse = 0.1f;
+	float MinMovementResponse = 0.05f;
 
 	/// <summary>
 	/// Movement response is how long (in seconds) it takes the character to start trying to follow new input. 
@@ -104,7 +104,7 @@ public:
 	/// A factor applied to new movements (either starting from a stop, or interrupting a current movement)
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
-	float LaunchForce = 1.5f;
+	float LaunchForce = 0.5f;
 
 
 
@@ -116,10 +116,12 @@ public:
 
 
 	/// <summary>
-	/// An arbitrary factor to apply to urgency for tuning purposes
+	/// An arbitrary factor to apply to urgency for tuning purposes. Urgency naturally peaks in the condtion of 
+	/// moving at full speeed with a request to move at full speed 180 degrees. A value of 2.0 for the UrgencyFactor
+	/// would make it peak at the same conditions but 90 degrees
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
-	float UrgencyFactor = 1.0f;
+	float UrgencyFactor = 2.5f;
 
 	/// <summary>
 	/// How urgent a change needs to be to interrupt the current movement spline segment rather than waiting till we reach the end of the current curve. Range = 0..1
@@ -161,10 +163,11 @@ private:
 
 	void UpdateSplinePoints(float DeltaT, const FVector& Input);
 	void EvaluateNavigationSpline(float DeltaT);
-	void StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outOffset);
+	// TODO: This should take a data block
+	void StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outTangent, FVector& outOffset);
 
 
-	void MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaT);
+	void MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaSeconds);
 	void ResetSplineState(float DeltaSeconds = 0.0f);
 
 	void DebugDrawEvaluateForVelocity(float DeltaSeconds);
@@ -177,6 +180,7 @@ private:
 	FKBSplineState m_SplineState;
 
 	FVector m_CurrentMoveTarget;
+	FVector m_CurrentMoveTangent;
 	FVector m_SegmentChordDir;
 
 	FRotator m_DesiredRotation;
@@ -194,7 +198,7 @@ private:
 
 	bool m_interrupted = false;
 	const float m_InterruptionUrgencyReductionFactor = 0.5f;
-	const float m_MaxDeltaVMultiplier = 1.5f; // 2.0 would be going from full speed one way to full speed 180 degrees. 75% of that is usually good
+	const float m_MaxDeltaVMultiplier = 2.0f; // 2.0 would be going from full speed one way to full speed 180 degrees.
 
 	bool bEnabledSplineUpdates = false;
 #if !UE_BUILD_SHIPPING

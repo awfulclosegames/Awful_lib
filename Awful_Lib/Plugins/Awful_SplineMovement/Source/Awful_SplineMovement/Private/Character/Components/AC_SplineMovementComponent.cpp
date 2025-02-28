@@ -10,6 +10,7 @@
 
 #include "Spline/AC_KBSpline.h"
 
+//UE_DISABLE_OPTIMIZATION
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
 static TAutoConsoleVariable<bool> CVarAC_SplineMoveDebug(TEXT("Awful.SplineMovement.Debug"), false, TEXT("Enable/Disable debug visualization for the Spline movement component"));
@@ -34,6 +35,10 @@ void UAC_SplineMovementComponent::BeginPlay()
 
 void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
+#if !UE_BUILD_SHIPPING
+    m_DEBUG_PosAtStartOfUpdate = m_Character->GetActorLocation();
+#endif
+    
     m_interrupted = false;
     bEnabledSplineUpdates = bSplineWalk;
     if (bDisableWhenInAir)
@@ -57,21 +62,20 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 {
     FVector input = InputVector.GetClampedToMaxSize(1.0f);
     const float RequestedSpeedSquared = input.SizeSquared();
+    m_Throttle = m_LastRecordedSpeed;
 
     m_TimeSinceLastDeflectionChange += DeltaSeconds;
 
     if (bEnabledSplineUpdates && (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER))
     {
-        //FVector deflectionDelta = (input * GetMaxSpeed()) - Velocity;
-        FVector deflectionDelta = (input * GetMaxSpeed()) - (m_SegmentChordDir * m_LastRecordedSpeed);
-        float deflectionSqDeltaV = deflectionDelta.SquaredLength();
+        float deflectionDeltaV = (1.0f - m_SegmentChordDir.Dot(input)) * GetMaxSpeed();
 
-        if (deflectionSqDeltaV > FMath::Square(ResponseTollerance * GetMaxSpeed()))
+        if (deflectionDeltaV > (ResponseTollerance * GetMaxSpeed()))
         {
             m_CachedDeflection = input;
             // pressure is based on kinetic energy which is 0.5f * mass * vel^2. Assume a constant mass and pressure is proportional to the square of velocity
             // since the delta is computed from velocities it is already a square velocity... though in inconvenient units since energy is usually computed in m/s not cm/s
-            m_AccumulatedPressure += deflectionSqDeltaV;
+            m_AccumulatedPressure += FMath::Square(deflectionDeltaV);
             // normalized against the maximum possible delta V (from max speed in one direction to max speed in the opposite direction) and compensated for the accumulation
             // We don't actually want to normalize against the full delta v range since the top end is rarely used and it throws off the urgency so we use 75% of it (the coverage)
             m_AccumulatedNormalization += FMath::Square(m_MaxDeltaVMultiplier * GetMaxSpeed());
@@ -83,10 +87,10 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 
             UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("                         m_TimeSinceLastDeflectionChange: %f\n                         m_AccumulatedPressure: %f\n                                                  m_AccumulatedNormalization: %f\n                                                  current energy delta: %f\n                         m_UrgencyFactor: %f\n                         Previous Throttle: %f"),
                 m_TimeSinceLastDeflectionChange, 
-                m_AccumulatedPressure, m_AccumulatedNormalization, deflectionSqDeltaV,
+                m_AccumulatedPressure, m_AccumulatedNormalization, deflectionDeltaV,
                 m_UrgencyFactor, m_Throttle);
 
-            m_TimeSinceLastDeflectionChange = DeltaSeconds;
+            m_TimeSinceLastDeflectionChange = 0.0f;
             m_Throttle = m_CachedDeflection.Length() * GetMaxSpeed();
 
             HandleInterruption(input, DeltaSeconds);
@@ -101,8 +105,11 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
         {
             if (bSplineWalk)
             {
+                UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (input * 100), FColor::White, 8.0f, TEXT("Input (DeltaV: %f)"), deflectionDeltaV);
+                UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (m_SegmentChordDir * 100), FColor::Yellow, 8.0f, TEXT("Current Travel Target"));
+                
                 FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
-                FVector MovementResponseTarget = input * GetMaxSpeed() * GetCurrentMovementReponseTime();
+                FVector MovementResponseTarget = input * GetMaxSpeed() * (DeltaSeconds + GetCurrentMovementReponseTime());
                 RequestedTarget.Z = 0.0f;
                 MovementResponseTarget.Z = 0.0f;
                 FColor urgencyColor = m_interrupted ? FColor::Red : FColor::Blue;
@@ -126,20 +133,6 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
     Super::ControlledCharacterMove(input, DeltaSeconds);
 }
 
-FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input)
-{
-    FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
-
-    nextPointTarget += Input * GetMaxSpeed() * TargetTime;
-    nextPointTarget.Z = m_Character->GetActorLocation().Z;
-    return nextPointTarget;
-}
-
-float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
-{  
-    return FMath::Clamp((MinMovementResponse + m_TimeSinceLastDeflectionChange) * (1.0f - m_UrgencyFactor), MinMovementResponse, MaxMovementResponse);
-}
-
 void UAC_SplineMovementComponent::HandleInterruption(FVector input, float DeltaSeconds)
 {
     // if there's no urgency, than favour smoothness and stick to the standard response ranges
@@ -147,14 +140,11 @@ void UAC_SplineMovementComponent::HandleInterruption(FVector input, float DeltaS
     {
         // we know there is some urgency, the next question: is the current segment too long?
         float timeToMoveTarget = (m_CurrentMoveTarget - m_Character->GetActorLocation()).Length() / m_LastRecordedSpeed;
-        float targetResponseTime = MinMovementResponse + ((MaxMovementResponse - MinMovementResponse) * (1.0f - m_UrgencyFactor));
+        float targetResponseTime = FMath::Max(DeltaSeconds, MinMovementResponse) + ((MaxMovementResponse - MinMovementResponse) * (1.0f - m_UrgencyFactor));
         float junctionSplineTime = m_SplineState.Time + FMath::Max(0.0f, ((targetResponseTime - timeToMoveTarget) * m_LastRecordedSpeed) / (m_CurrentSegLen + UE_SMALL_NUMBER) );
         // estimate when we need to junction to the new movement request. Assume we can continue to respect the minimum movement response time
 
-        static constexpr float closeEnoughToTheEnd = 0.9f;
-        // interruptions can be jarring so add a bit of a fudge factor. If we ideally would junction at time 0.99 of the current segment then realistically we can
-        // wait till the end of the segment and try and transition normally
-        if (junctionSplineTime < closeEnoughToTheEnd)
+        if (junctionSplineTime < 1.0f)
         {
             FVector junctionPoint = UAC_KBSpline::SampleExplicit(m_SplineState, junctionSplineTime);
 
@@ -184,6 +174,20 @@ void UAC_SplineMovementComponent::HandleInterruption(FVector input, float DeltaS
 #endif
         }
     }
+}
+
+FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input)
+{
+    FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
+
+    nextPointTarget += Input * GetMaxSpeed() * (DeltaT + TargetTime);
+    nextPointTarget.Z = m_Character->GetActorLocation().Z;
+    return nextPointTarget;
+}
+
+float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
+{
+    return FMath::Clamp((MinMovementResponse + m_TimeSinceLastDeflectionChange) * (1.0f - m_UrgencyFactor), MinMovementResponse, MaxMovementResponse);
 }
 
 void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector& Input)
@@ -245,14 +249,16 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
             if (m_SplineState.IsValidSegment())
             {
                 FVector candidateTarget;
+                FVector candidateTangent;
                 FVector candidateOfset;
 
                 // may need to step multiple times through the spline to get a sample point relatively ahead of the character. cubic splines can 'lean' backwards 
                 // if the chords meet at a highly acute angle
-                StepSplineTarget(DeltaT, momentumDir, projectedMomentum, candidateTarget, candidateOfset);
+                StepSplineTarget(DeltaT, momentumDir, projectedMomentum, candidateTarget, candidateTangent, candidateOfset);
                 if (m_SplineState.Time <= 1.0f && projectedMomentum > chordNormalizedExpectedTravel)
                 {
                     m_CurrentMoveTarget = candidateTarget;
+                    m_CurrentMoveTangent = candidateTangent;
                     targetOffset = candidateOfset;
                     break;
                 }
@@ -281,10 +287,11 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
         m_LastValidSegment = m_SplineState.CurrentTraversalSegment;
 }
 
-void UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outOffset)
+void UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outTangent, FVector& outOffset)
 {
     const FVector& fromPoint = m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location;
     FVector currentMoveTarget = m_CurrentMoveTarget;
+    FVector tangent = outTangent;
     FVector currentOffset = outOffset;
     float currentProjectedMomentum = outProjectedMomentum;
     // try and update the point within the segment
@@ -294,7 +301,7 @@ void UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& 
     {
         // get the current position on the curve, get tangent here, and use that to estimate the next step along the curve. Then project that against 
         // the chord and normalize to get the new update time (make sure it doesn't go backwards too)
-        FVector tangent = UAC_KBSpline::ComputeTangent(m_SplineState);        
+        tangent = UAC_KBSpline::ComputeTangent(m_SplineState);        
         FVector normalizedTargetPoint = currentMoveTarget + (tangent * DeltaT) - fromPoint;
         FVector normalizedExpectedStep = normalizedTargetPoint;
         float candidateTime = m_SegmentChordDir.Dot(normalizedExpectedStep) / m_CurrentSegLen;
@@ -317,29 +324,28 @@ void UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& 
         stillTrying = (currentProjectedMomentum < 0.0f) && (projectedPos > targetProjPos);
     }
     outTarge = currentMoveTarget;
+    outTangent = tangent;
     outOffset = currentOffset;
     outProjectedMomentum = currentProjectedMomentum;
 }
 
 
 
-void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaT)
+void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaSeconds)
 {
+    FVector targetMomentumDir = MomentumDir;
     // if we're not moving, don't bother
     if (TargetOffset.SquaredLength() > 0.0f)
     {
-#if !UE_BUILD_SHIPPING
-        m_DEBUG_PosAtStartOfUpdate = m_Character->GetActorLocation();
-#endif
         // we're locking to the rail so clamp the movement 
         if (bForceStayOnRail)
         {
-            if (DeltaT > 0.0f)
+            if (DeltaSeconds > 0.0f)
             {
                 float offsetDist = TargetOffset.Length();
-                float travelDist = FMath::Min(offsetDist / DeltaT, m_Throttle);
+                float travelDist = FMath::Min(offsetDist / DeltaSeconds, m_Throttle);
 
-                Acceleration = ((TargetOffset / offsetDist) * travelDist) / DeltaT;
+                Acceleration = ((TargetOffset / offsetDist) * travelDist) / DeltaSeconds;
 #if !UE_BUILD_SHIPPING
                 m_DEBUG_ComputedVelocity = (TargetOffset / offsetDist) * travelDist;
                 m_DEBUG_ComputedAcceleration = Acceleration;
@@ -348,37 +354,45 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
             return;
         }
 
+        FVector railDir = m_CurrentMoveTangent.Cross(m_Character->GetActorUpVector()).GetSafeNormal();
+
         // Try and aim at the nearest point on the (potentially non-zero width) rail to try and travel to. 
         // Travel will be at the current set movement speed so the character may still overshoot or fall short of the rail
-        FVector errorVec = (MomentumDir * MomentumDir.Dot(TargetOffset)) - TargetOffset;
-
+        // 
+        // compute the momentum rail crossing at the move target point do see if we're outside of tollerances
+        FVector errorVec = railDir * ((MomentumDir * MomentumDir.Dot(TargetOffset)) - TargetOffset).Dot(railDir);
+        bool headingCorrectionNeeded = errorVec.SquaredLength() > FMath::Square(RailWidth * 0.5f);
         // if the error is more than the width of the rail, then aim for the near edge of the rail
-        if (errorVec.SquaredLength() > FMath::Square(RailWidth * 0.5f))
+        if (headingCorrectionNeeded)
         {
             // can do the unsafe normalize since we know it's length is non-zero from the conditional
             errorVec = errorVec.GetUnsafeNormal() * RailWidth * 0.5f;
+            targetMomentumDir = (TargetOffset + errorVec).GetSafeNormal();
         }
 
 #if !UE_BUILD_SHIPPING
         if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
         {
+         
+            for (int wsPt = 0; wsPt < FKBSplineState::NumberOfPoints; ++wsPt)
+            {
+                UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_SplineState.WorkingSet[wsPt].Location, 6.0f, FColor::Orange, TEXT(""));
+            }
+
+            FVector debug_MomentumRailCrossing = railDir * ((MomentumDir * MomentumDir.Dot(TargetOffset)) - TargetOffset).Dot(railDir);
             FVector debug_RailWidthVec = errorVec.GetSafeNormal() * RailWidth * 0.5f;
-            UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + TargetOffset, m_DEBUG_PosAtStartOfUpdate + TargetOffset + debug_RailWidthVec, FColor::Black, 5.0f, TEXT("Rail"));
+            UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + TargetOffset + debug_MomentumRailCrossing, FColor::Green, 5.0f, TEXT("Momentum Rail Crossing"));
+            UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + TargetOffset, m_DEBUG_PosAtStartOfUpdate + TargetOffset + debug_RailWidthVec, FColor::Black, 10.0f, TEXT("Rail"));
             UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + TargetOffset, m_DEBUG_PosAtStartOfUpdate + errorVec, FColor::Cyan, 1.0f, TEXT("Intention"));
             UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + TargetOffset, m_DEBUG_PosAtStartOfUpdate, FColor::Orange, 4.0f, TEXT("Goal"));
-            UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + TargetOffset, m_DEBUG_PosAtStartOfUpdate + TargetOffset + errorVec, FColor::Red, 2.0f, TEXT(""));
+            UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + TargetOffset, m_DEBUG_PosAtStartOfUpdate + TargetOffset + errorVec, FColor::Red, 2.0f, TEXT("%f"), errorVec.Length());
         }
 #endif
-        TargetOffset += errorVec;
 
-        if (DeltaT > 0.0f)
-        {
-            const float MaxInputSpeed = FMath::Max(GetMaxSpeed() * AnalogInputModifier, GetMinAnalogSpeed());
-            Velocity = ((TargetOffset.GetSafeNormal() * m_Throttle)).GetClampedToMaxSize(MaxInputSpeed);
-        }
-
+        Velocity = targetMomentumDir * m_Throttle;
+      
 #if !UE_BUILD_SHIPPING
-        m_DEBUG_ComputedVelocity = TargetOffset.GetSafeNormal() * m_Throttle;
+        m_DEBUG_ComputedVelocity = Velocity;
         m_DEBUG_ComputedAcceleration = Acceleration;
 #endif
     }
@@ -416,6 +430,12 @@ void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
 void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
 {
 #if !UE_BUILD_SHIPPING
+
+    int ctrlIdx = 0;
+    for (auto& ctrlpt : m_SplineConfig->ControlPoints)
+    {
+        UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, ctrlpt.Location, 10.0f, FColor::Black, TEXT("[%i]"), ctrlIdx++);
+    }
 
     UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("*****************************\n        TICK\n*****************************\n        Segment: %i (isValid: %s)\n        Commit: %i\n        m_CurrentMoveTarget: %s\n        targetOffset: %s\n         Current Time: %f\n*****************************"),
         m_SplineState.CurrentTraversalSegment, (m_SplineConfig->IsValidSegment(m_SplineState.CurrentTraversalSegment) ? TEXT("True") : TEXT("False")), m_SplineConfig->CommitPoint,
@@ -455,7 +475,6 @@ void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
 
         UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, urgencyBarLoc, urgencyBarLoc + (FVector::UpVector * m_UrgencyFactor * 200.0f), urgencyColor, 5.0f, TEXT("Urgency: %f"), m_UrgencyFactor);
         //DrawDebugLine(m_Character->GetWorld(), urgencyBarLoc, urgencyBarLoc + (FVector::UpVector * m_UrgencyFactor * 200.0f), urgencyColor, false, 1, 0 ,3.0f);
-
     }
 
 #endif
@@ -494,7 +513,7 @@ void UAC_SplineMovementComponent::ApplyAccumulatedForces(float DeltaSeconds)
         EvaluateNavigationSpline(DeltaSeconds);
         if (m_SplineState.IsValidSegment())
         {
-            m_DesiredRotation = Velocity.GetSafeNormal().Rotation();
+            m_DesiredRotation = Velocity.Rotation();
         }
     }
 }
