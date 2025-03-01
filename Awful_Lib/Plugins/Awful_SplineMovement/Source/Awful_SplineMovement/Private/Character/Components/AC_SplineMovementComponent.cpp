@@ -207,7 +207,7 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
 
         const FQuat baseRotation = Velocity.ToOrientationRotator().Quaternion();
         const FQuat inputRotation = Input.ToOrientationRotator().Quaternion();
-        const FQuat deltaRotation = (inputRotation * baseRotation.Inverse()) * InputCurveContinuationFactor;
+        FQuat deltaRotation = (inputRotation * baseRotation.Inverse()) * InputCurveContinuationFactor;
         FVector stepDir = Input;
         while (maxLookahead > 0.0f)
         {
@@ -217,6 +217,7 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
             maxLookahead -= lookaheadStep;
             nextPointTarget = GenerateNewSplinePoint(DeltaT, lookaheadStep, stepDir);
             UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
+            deltaRotation *= 1.0f - InputCurveContinuationDecay;
         }
     }
     m_SplineConfig->CommitPoint = 3;

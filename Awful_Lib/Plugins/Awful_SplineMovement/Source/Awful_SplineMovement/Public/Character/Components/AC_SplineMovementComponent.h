@@ -61,7 +61,16 @@ public:
 	/// 1 is assume each step of the look ahead has as much offset from the previous as the new movement has from the previous frame
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
-	float InputCurveContinuationFactor = 0.7;
+	float InputCurveContinuationFactor = 0.9;
+
+	/// <summary>
+	/// How much do the look ahead curve flattens as we move into the future
+	/// Range 0..1
+	/// 0 means never 
+	/// 1 means immediately
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
+	float InputCurveContinuationDecay = 0.25;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	bool bSplineWalk = false;
