@@ -204,16 +204,18 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
 
         // can add additional look ahead points for managing things like Motion Matching here. Note still respect constraints
         float maxLookahead = ControlLookahead - targetTime;
-        // the InputCurveContinuationFactor here is to give some contorl over how much we bias additional lookahead points in the direction of movement
-        FVector stepMotion = (Input * GetMaxSpeed() * (1.0f + InputCurveContinuationFactor)) - (InputCurveContinuationFactor * Velocity);
-        FVector lookaheadVector = (stepMotion).GetSafeNormal();
 
+        const FQuat baseRotation = Velocity.ToOrientationRotator().Quaternion();
+        const FQuat inputRotation = Input.ToOrientationRotator().Quaternion();
+        const FQuat deltaRotation = (inputRotation * baseRotation.Inverse()) * InputCurveContinuationFactor;
+        FVector stepDir = Input;
         while (maxLookahead > 0.0f)
         {
+            stepDir = deltaRotation.RotateVector(stepDir);
             float lookaheadStep = (targetTime + MaxMovementResponse) * 0.5f;
             lookaheadStep = FMath::Min(lookaheadStep, ControlLookahead);
             maxLookahead -= lookaheadStep;
-            nextPointTarget = GenerateNewSplinePoint(DeltaT, lookaheadStep, lookaheadVector);
+            nextPointTarget = GenerateNewSplinePoint(DeltaT, lookaheadStep, stepDir);
             UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
         }
     }
