@@ -197,8 +197,8 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
     float targetTime = GetCurrentMovementReponseTime();
 
     FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, targetTime, Input);
-    // if we're within a rail width we aren't really needing to move, at least our move won't be reliable, since that's the margine of error
-    if ((nextPointTarget - m_Character->GetActorLocation()).SquaredLength() > FMath::Square(RailWidth))
+    // enforce minimum spline point spacing
+    if ((nextPointTarget - m_Character->GetActorLocation()).SquaredLength() > FMath::Square(MinimumSplinePointSpacing))
     {
         UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
 
@@ -209,13 +209,17 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
         const FQuat inputRotation = Input.ToOrientationRotator().Quaternion();
         FQuat deltaRotation = (inputRotation * baseRotation.Inverse()) * InputCurveContinuationFactor;
         FVector stepDir = Input;
+        float stepTime = FMath::Max(targetTime, DeltaT);
+
         while (maxLookahead > 0.0f)
         {
+            // A consideration here is to move the step time interpolation to the end of the loop, if we want to ensure that the 
+            // first lookahead step is no longer than the first (can improve response in the zero minimum response time case)
+            stepTime = FMath::Lerp(stepTime, MaxMovementResponse, InputLookaheadBlendout);
             stepDir = deltaRotation.RotateVector(stepDir);
-            float lookaheadStep = (targetTime + MaxMovementResponse) * 0.5f;
-            lookaheadStep = FMath::Min(lookaheadStep, ControlLookahead);
-            maxLookahead -= lookaheadStep;
-            nextPointTarget = GenerateNewSplinePoint(DeltaT, lookaheadStep, stepDir);
+            stepTime = FMath::Min(stepTime, maxLookahead);
+            maxLookahead -= stepTime;
+            nextPointTarget = GenerateNewSplinePoint(DeltaT, stepTime, stepDir);
             UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
             deltaRotation *= 1.0f - InputCurveContinuationDecay;
         }

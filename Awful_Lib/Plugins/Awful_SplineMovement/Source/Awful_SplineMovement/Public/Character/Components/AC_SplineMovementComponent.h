@@ -62,6 +62,23 @@ public:
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
 	float InputCurveContinuationFactor = 0.9;
+	
+	/// <summary>
+	/// The rate at which we lengthen the lookahead segments from the current input segment length
+	/// Range 0..1
+	/// 0 is no lengthening, use the input segment length all the way to the look ahead point
+	/// 1 is immediatly use the maximum length possible of segment for the look ahead (this will either be
+	/// MaxMovementResponse or the remaining time till lookahead, whichever is smaller)
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
+	float InputLookaheadBlendout = 0.1;
+
+	/// <summary>
+	/// the shortest distance, in Unreal units (cm), that can seperate two consecuative points on the spline 
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
+	float MinimumSplinePointSpacing = 4;
+
 
 	/// <summary>
 	/// How much do the look ahead curve flattens as we move into the future
