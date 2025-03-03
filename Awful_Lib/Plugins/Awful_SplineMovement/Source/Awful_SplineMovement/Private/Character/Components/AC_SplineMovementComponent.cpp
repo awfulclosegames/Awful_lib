@@ -205,9 +205,13 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
         // can add additional look ahead points for managing things like Motion Matching here. Note still respect constraints
         float maxLookahead = ControlLookahead - targetTime;
 
-        const FQuat baseRotation = Velocity.ToOrientationRotator().Quaternion();
+        //const FQuat baseRotation = Velocity.ToOrientationRotator().Quaternion();
         const FQuat inputRotation = Input.ToOrientationRotator().Quaternion();
-        FQuat deltaRotation = (inputRotation * baseRotation.Inverse()) * InputCurveContinuationFactor;
+        const FQuat prevMotionRotation = m_SegmentChordDir.ToOrientationRotator().Quaternion(); // seg chord hasn't been updated yet
+        //FQuat deltaRotation = (inputRotation * baseRotation.Inverse()) * InputCurveContinuationFactor;
+        FQuat deltaRotation = (inputRotation * prevMotionRotation.Inverse()) * InputCurveContinuationFactor;
+
+
         FVector stepDir = Input;
         float stepTime = FMath::Max(targetTime, DeltaT);
 
@@ -255,6 +259,7 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
         {
             if (m_SplineState.IsValidSegment())
             {
+                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("   Evaluatng on valid segment"));
                 FVector candidateTarget;
                 FVector candidateTangent;
                 FVector candidateOfset;
@@ -264,6 +269,7 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
                 StepSplineTarget(DeltaT, momentumDir, projectedMomentum, candidateTarget, candidateTangent, candidateOfset);
                 if (m_SplineState.Time <= 1.0f && projectedMomentum > chordNormalizedExpectedTravel)
                 {
+                    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("   Have valid and updatedmove target"));
                     m_CurrentMoveTarget = candidateTarget;
                     m_CurrentMoveTangent = candidateTangent;
                     targetOffset = candidateOfset;
@@ -272,10 +278,12 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
             }
             else
             {
+                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("   INVALID SEGMENT\n         Move on to the next segment"));
                 // try and get a new segment
                 int proposedSegment = m_SplineConfig->GetNextCandidateSegment(m_SplineState.CurrentTraversalSegment);
+                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("         Was %i   attempting %i"),m_SplineState.CurrentTraversalSegment, proposedSegment);
+                
                 m_SplineState = UAC_KBSpline::PrepareForEvaluation(m_SplineConfig, proposedSegment);
-
                 UAC_KBSpline::GetChord(m_SplineConfig, proposedSegment, m_SegmentChordDir);
                 m_CurrentSegLen = m_SegmentChordDir.Length();
                 if (m_CurrentSegLen > 0.0f)
@@ -296,6 +304,8 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
 
 void UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outTangent, FVector& outOffset)
 {
+    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("   StepSplineTarget"));
+
     const FVector& fromPoint = m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location;
     FVector currentMoveTarget = m_CurrentMoveTarget;
     FVector tangent = outTangent;
@@ -508,7 +518,6 @@ FRotator UAC_SplineMovementComponent::ComputeOrientToMovementRotation(const FRot
     }
 
     return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
-
 }
 
 void UAC_SplineMovementComponent::ApplyAccumulatedForces(float DeltaSeconds)
