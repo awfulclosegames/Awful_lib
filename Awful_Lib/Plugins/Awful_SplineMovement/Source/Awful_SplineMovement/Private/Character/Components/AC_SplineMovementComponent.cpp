@@ -205,21 +205,22 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
         // can add additional look ahead points for managing things like Motion Matching here. Note still respect constraints
         float maxLookahead = ControlLookahead - targetTime;
 
-        //const FQuat baseRotation = Velocity.ToOrientationRotator().Quaternion();
         const FQuat inputRotation = Input.ToOrientationRotator().Quaternion();
         const FQuat prevMotionRotation = m_SegmentChordDir.ToOrientationRotator().Quaternion(); // seg chord hasn't been updated yet
-        //FQuat deltaRotation = (inputRotation * baseRotation.Inverse()) * InputCurveContinuationFactor;
         FQuat deltaRotation = (inputRotation * prevMotionRotation.Inverse()) * InputCurveContinuationFactor;
+        //const FQuat baseRotation = Velocity.ToOrientationRotator().Quaternion();
+        //FQuat deltaRotation = (inputRotation * baseRotation.Inverse()) * InputCurveContinuationFactor;
 
 
         FVector stepDir = Input;
         float stepTime = FMath::Max(targetTime, DeltaT);
+        float stepMaxTime = FMath::Max(MaxMovementResponse, DeltaT);
 
         while (maxLookahead > 0.0f)
         {
             // A consideration here is to move the step time interpolation to the end of the loop, if we want to ensure that the 
             // first lookahead step is no longer than the first (can improve response in the zero minimum response time case)
-            stepTime = FMath::Lerp(stepTime, MaxMovementResponse, InputLookaheadBlendout);
+            stepTime = FMath::Lerp(stepTime, stepMaxTime, InputLookaheadBlendout);
             stepDir = deltaRotation.RotateVector(stepDir);
             stepTime = FMath::Min(stepTime, maxLookahead);
             maxLookahead -= stepTime;
@@ -511,7 +512,7 @@ void UAC_SplineMovementComponent::SetUseSpline(bool Value)
 
 FRotator UAC_SplineMovementComponent::ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const
 {
-    if (bEnabledSplineUpdates)
+    if (bEnabledSplineUpdates && m_SplineState.IsValidSegment())
     {
         auto nextRotation = FMath::Lerp(CurrentRotation, m_DesiredRotation, RotationBlendRate);
         return nextRotation;
@@ -532,5 +533,15 @@ void UAC_SplineMovementComponent::ApplyAccumulatedForces(float DeltaSeconds)
             m_DesiredRotation = Velocity.Rotation();
         }
     }
+}
+
+void UAC_SplineMovementComponent::HandleImpact(const FHitResult& Hit, float TimeSlice, const FVector& MoveDelta)
+{
+    // If we're blocked, then drop the spline and just slide until we're unobstructed again
+    if (Hit.IsValidBlockingHit())
+    {
+        ResetSplineState(TimeSlice);
+    }
+    Super::HandleImpact(Hit, TimeSlice, MoveDelta);
 }
 

@@ -179,6 +179,8 @@ public:
 	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const override;
 	virtual void ApplyAccumulatedForces(float DeltaSeconds) override;
 
+	virtual void HandleImpact(const FHitResult& Hit, float TimeSlice = 0.f, const FVector& MoveDelta = FVector::ZeroVector) override;
+
 protected:
 	// Adding a new point into the control point stream. virtual so derived classes can provide whatever point generating logic they like
 	virtual FVector GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input);

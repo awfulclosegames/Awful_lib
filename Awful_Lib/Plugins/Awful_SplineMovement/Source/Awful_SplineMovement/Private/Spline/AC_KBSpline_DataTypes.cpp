@@ -10,6 +10,7 @@ const int UKBSplineConfig::sDefaultBufferLength = 80;
 UKBSplineConfig::UKBSplineConfig(FVector Location)
 	: Super()
 	, ControlPoints(sDefaultBufferLength)
+	, MaxControlPointBuffer(sDefaultBufferLength)
 {
 	OriginPoint.Location = Location;
 }
@@ -18,6 +19,7 @@ UKBSplineConfig::UKBSplineConfig(FVector Location)
 UKBSplineConfig::UKBSplineConfig(FVector Location, int NumPoints)
 	: Super()
 	, ControlPoints(NumPoints)
+	, MaxControlPointBuffer(NumPoints)
 {
 	OriginPoint.Location = Location;
 }
@@ -74,6 +76,12 @@ bool UKBSplineConfig::IsValidNormalizedSegment(int SegmentID) const
 
 void UKBSplineConfig::Add(FKBSplinePoint& Point)
 {
+	if (ControlPoints.Num() >= MaxControlPointBuffer)
+	{
+		// drop the last point
+		// these may be the most recently added, but they are also the farthest in the future
+		ControlPoints.Pop();
+	}
 	ControlPoints.Add(Point);
 }
 

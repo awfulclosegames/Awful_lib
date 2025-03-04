@@ -172,5 +172,6 @@ private:
 	bool IsValidNormalizedSegment(int SegmentID) const;
 
 	int MinimumSegment = 0;
+	int MaxControlPointBuffer = sDefaultBufferLength;
 };
 
