@@ -62,7 +62,7 @@ public:
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
 	float InputCurveContinuationFactor = 0.9;
-	
+
 	/// <summary>
 	/// The rate at which we lengthen the lookahead segments from the current input segment length
 	/// Range 0..1
@@ -177,7 +177,7 @@ public:
 
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const override;
-	virtual void ApplyAccumulatedForces(float DeltaSeconds) override;
+	virtual void PerformMovement(float DeltaTime) override;
 
 	virtual void HandleImpact(const FHitResult& Hit, float TimeSlice = 0.f, const FVector& MoveDelta = FVector::ZeroVector) override;
 
@@ -211,7 +211,6 @@ private:
 	FVector m_CurrentMoveTangent;
 	FVector m_SegmentChordDir;
 
-	FRotator m_DesiredRotation;
 	int m_LastValidSegment = 0;
 	float m_CurrentSegLen = 1.0f;
 

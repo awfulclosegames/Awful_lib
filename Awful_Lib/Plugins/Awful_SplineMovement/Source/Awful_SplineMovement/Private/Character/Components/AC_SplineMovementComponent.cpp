@@ -10,7 +10,6 @@
 
 #include "Spline/AC_KBSpline.h"
 
-//UE_DISABLE_OPTIMIZATION
 DEFINE_LOG_CATEGORY_STATIC(LogSplineMovement, Log, All);
 
 static TAutoConsoleVariable<bool> CVarAC_SplineMoveDebug(TEXT("Awful.SplineMovement.Debug"), false, TEXT("Enable/Disable debug visualization for the Spline movement component"));
@@ -48,7 +47,6 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-    m_LastRecordedSpeed = Velocity.Length();
 
 #if !UE_BUILD_SHIPPING
     if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
@@ -60,6 +58,8 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds)
 {
+    m_LastRecordedSpeed = Velocity.Length();
+    
     FVector input = InputVector.GetClampedToMaxSize(1.0f);
     const float RequestedSpeedSquared = input.SizeSquared();
     m_Throttle = m_LastRecordedSpeed;
@@ -363,7 +363,7 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
                 float offsetDist = TargetOffset.Length();
                 float travelDist = FMath::Min(offsetDist / DeltaSeconds, m_Throttle);
 
-                Acceleration = ((TargetOffset / offsetDist) * travelDist) / DeltaSeconds;
+                Acceleration += ((TargetOffset / offsetDist) * travelDist) / DeltaSeconds;
 #if !UE_BUILD_SHIPPING
                 m_DEBUG_ComputedVelocity = (TargetOffset / offsetDist) * travelDist;
                 m_DEBUG_ComputedAcceleration = Acceleration;
@@ -379,13 +379,20 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         // 
         // compute the momentum rail crossing at the move target point do see if we're outside of tollerances
         FVector errorVec = railDir * ((MomentumDir * MomentumDir.Dot(TargetOffset)) - TargetOffset).Dot(railDir);
-        bool headingCorrectionNeeded = errorVec.SquaredLength() > FMath::Square(RailWidth * 0.5f);
+        float elasticError = errorVec.SquaredLength() / FMath::Square(RailWidth * 0.5f);
+
         // if the error is more than the width of the rail, then aim for the near edge of the rail
-        if (headingCorrectionNeeded)
+        if (elasticError > 1.0f)
         {
             // can do the unsafe normalize since we know it's length is non-zero from the conditional
             errorVec = errorVec.GetUnsafeNormal() * RailWidth * 0.5f;
             targetMomentumDir = (TargetOffset + errorVec).GetSafeNormal();
+        }
+        else
+        {
+            // elstic control. Use the weighted error to blend in the tangent 
+            FVector tangentDir = UAC_KBSpline::ComputeTangent(m_SplineState).GetSafeNormal(); // this is cachable!
+            targetMomentumDir = FMath::Lerp(targetMomentumDir, tangentDir, elasticError);
         }
 
 #if !UE_BUILD_SHIPPING
@@ -407,10 +414,10 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         }
 #endif
 
-        Velocity = targetMomentumDir * m_Throttle;
+        Acceleration += ((targetMomentumDir * m_Throttle) - Velocity) / DeltaSeconds;
       
 #if !UE_BUILD_SHIPPING
-        m_DEBUG_ComputedVelocity = Velocity;
+        m_DEBUG_ComputedVelocity = targetMomentumDir * m_Throttle;
         m_DEBUG_ComputedAcceleration = Acceleration;
 #endif
     }
@@ -420,7 +427,6 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
 void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
 {
 #if !UE_BUILD_SHIPPING
-    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("   Resetting Spline!"));
     m_DEBUG_DrawnSegment = -1;
 #endif
 
@@ -448,6 +454,8 @@ void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
 void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
 {
 #if !UE_BUILD_SHIPPING
+    if (!bSplineWalk)
+        return;
 
     int ctrlIdx = 0;
     for (auto& ctrlpt : m_SplineConfig->ControlPoints)
@@ -476,6 +484,7 @@ void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
 
     UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), FColor::Purple, 3.0f, TEXT("Vel Step"));
     UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), 1.0f, FColor::Red, TEXT("Vel Step"));
+    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + (m_DEBUG_ComputedVelocity * DeltaT), 1.0f, FColor::Cyan, TEXT("Computed Vel Step"));
 
     if (CVarAC_SplineDetailedMoveDebug.GetValueOnAnyThread())
     {
@@ -514,25 +523,22 @@ FRotator UAC_SplineMovementComponent::ComputeOrientToMovementRotation(const FRot
 {
     if (bEnabledSplineUpdates && m_SplineState.IsValidSegment())
     {
-        auto nextRotation = FMath::Lerp(CurrentRotation, m_DesiredRotation, RotationBlendRate);
+        FRotator nextRotation = FMath::Lerp(CurrentRotation, Velocity.Rotation(), RotationBlendRate);
         return nextRotation;
     }
 
     return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
 }
 
-void UAC_SplineMovementComponent::ApplyAccumulatedForces(float DeltaSeconds)
+void UAC_SplineMovementComponent::PerformMovement(float DeltaTime)
 {
-    Super::ApplyAccumulatedForces(DeltaSeconds);
-
     if (bEnabledSplineUpdates)
     {
-        EvaluateNavigationSpline(DeltaSeconds);
-        if (m_SplineState.IsValidSegment())
-        {
-            m_DesiredRotation = Velocity.Rotation();
-        }
+        m_LastRecordedSpeed = Velocity.Length();
+        EvaluateNavigationSpline(DeltaTime);
     }
+
+    Super::PerformMovement(DeltaTime);
 }
 
 void UAC_SplineMovementComponent::HandleImpact(const FHitResult& Hit, float TimeSlice, const FVector& MoveDelta)
