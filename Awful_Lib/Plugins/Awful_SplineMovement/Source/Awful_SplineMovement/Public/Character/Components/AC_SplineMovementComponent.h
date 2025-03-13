@@ -178,6 +178,7 @@ public:
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const override;
 	virtual void PerformMovement(float DeltaTime) override;
+	virtual void CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration) override;
 
 	virtual void HandleImpact(const FHitResult& Hit, float TimeSlice = 0.f, const FVector& MoveDelta = FVector::ZeroVector) override;
 
@@ -223,7 +224,9 @@ private:
 	float m_AccumulatedPressure = 0.0f;
 	float m_AccumulatedNormalization = 0.0f;
 
-	bool m_interrupted = false;
+	FVector m_SplineFollowingAcceleration;
+
+	bool m_Interrupted = false;
 	const float m_InterruptionUrgencyReductionFactor = 0.5f;
 	const float m_MaxDeltaVMultiplier = 2.0f; // 2.0 would be going from full speed one way to full speed 180 degrees.
 
