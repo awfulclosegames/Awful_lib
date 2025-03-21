@@ -193,7 +193,7 @@ private:
 	void UpdateSplinePoints(float DeltaT, const FVector& Input);
 	void EvaluateNavigationSpline(float DeltaT);
 	// TODO: This should take a data block
-	void StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outTangent, FVector& outOffset);
+	bool StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outTangent, FVector& outOffset);
 
 
 	void MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaSeconds);
