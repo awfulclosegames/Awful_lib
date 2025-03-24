@@ -289,12 +289,12 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
                 }
             }
         }
-    }
 
-    if (m_SplineState.IsValidSegment() && DeltaT > 0.0f)
-    {
-        MoveAlongRail(momentumDir, targetOffset, DeltaT);
-        m_LastValidSegment = m_SplineState.CurrentTraversalSegment;
+        if (m_SplineState.IsValidSegment() && DeltaT > 0.0f)
+        {
+            MoveAlongRail(momentumDir, targetOffset, DeltaT);
+            m_LastValidSegment = m_SplineState.CurrentTraversalSegment;
+        }
     }
 }
 
@@ -355,7 +355,7 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
 {
     FVector targetMomentumDir = MomentumDir;
     // if we're not moving, don't bother
-    if (TargetOffset.SquaredLength() > (m_LastRecordedSpeed * DeltaSeconds))
+    if (TargetOffset.SquaredLength() > 0.0f)
     {
         // we're locking to the rail so clamp the movement 
         if (bForceStayOnRail)
@@ -383,7 +383,7 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         FVector errorVec = railDir * ((MomentumDir * MomentumDir.Dot(TargetOffset)) - TargetOffset).Dot(railDir);
 
         // 10% fudge factor. Corresponds to the other 10% to effectively make the rail walls a bit thicker
-        constexpr float MinimalError = 0.05f; // we always want a bit of the tangent incorpertated 
+        constexpr float MinimalError = 0.1f; // we always want a bit of the tangent incorpertated 
         float elasticError = FMath::Max(MinimalError, errorVec.SquaredLength() / FMath::Square(RailWidth * 0.5f * 0.9f));
         bool headingCorrectionNeeded = elasticError > 1.0f;
 
