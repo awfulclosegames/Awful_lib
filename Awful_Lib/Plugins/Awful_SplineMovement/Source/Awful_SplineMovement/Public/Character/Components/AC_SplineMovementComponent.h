@@ -191,6 +191,7 @@ private:
 	void HandleInterruption(FVector input, float DeltaSeconds);
 
 	void UpdateSplinePoints(float DeltaT, const FVector& Input);
+	void FilloutLookahead(const FVector& Input, float TargetTime, float DeltaT);
 	void EvaluateNavigationSpline(float DeltaT);
 	// TODO: This should take a data block
 	bool StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outTangent, FVector& outOffset);
@@ -226,6 +227,7 @@ private:
 
 	FVector m_SplineFollowingAcceleration;
 
+	bool m_Launching = false;
 	bool m_Interrupted = false;
 	const float m_InterruptionUrgencyReductionFactor = 0.5f;
 	const float m_MaxDeltaVMultiplier = 2.0f; // 2.0 would be going from full speed one way to full speed 180 degrees.

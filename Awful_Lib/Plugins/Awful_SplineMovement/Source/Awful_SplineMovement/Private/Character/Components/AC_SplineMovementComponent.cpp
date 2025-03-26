@@ -37,8 +37,8 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 #if !UE_BUILD_SHIPPING
     m_DEBUG_PosAtStartOfUpdate = m_Character->GetActorLocation();
 #endif
-    
     m_SplineFollowingAcceleration = FVector::ZeroVector;
+UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("== Tick\n     m_LastRecordedSpeed :  %f"), m_LastRecordedSpeed);
 
     m_Interrupted = false;
     bEnabledSplineUpdates = bSplineWalk;
@@ -49,6 +49,7 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+    m_LastRecordedSpeed = Velocity.Length();
 
 #if !UE_BUILD_SHIPPING
     if (CVarAC_SplineMoveDebug.GetValueOnAnyThread())
@@ -60,8 +61,6 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds)
 {
-    m_LastRecordedSpeed = Velocity.Length();
-    
     FVector input = InputVector.GetClampedToMaxSize(1.0f);
     const float RequestedSpeedSquared = input.SizeSquared();
 
@@ -86,11 +85,18 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             m_UrgencyFactor = (m_AccumulatedPressure) / m_AccumulatedNormalization;
             m_UrgencyFactor = FMath::Clamp(m_UrgencyFactor * UrgencyFactor, 0.0f, 1.0f);
 
+            constexpr float MinimumSpeedForLaunch = 30.0f; // arbitrary value less than (in cm/s) counts as starting from standing 
+            m_Launching = (m_LastRecordedSpeed <= MinimumSpeedForLaunch) && (m_TimeSinceLastDeflectionChange > (2.0f * MinMovementResponse));
+            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("== ControlledCharacterMove\n     m_Launching :  %i     m_LastRecordedSpeed :  %f     m_TimeSinceLastDeflectionChange :  %f (2 * %f = %f)"),
+                m_Launching, m_LastRecordedSpeed, m_TimeSinceLastDeflectionChange, MinMovementResponse, (2.0f * MinMovementResponse));
+
+            //m_TimeSinceLastDeflectionChange = m_Launching ? 0.0f : m_TimeSinceLastDeflectionChange;
             m_TimeSinceLastDeflectionChange = 0.0f;
             m_Throttle = RequestedSpeedSquared * GetMaxSpeed();
 
             HandleInterruption(m_CachedDeflection, DeltaSeconds);
         }
+
 
         m_AccumulatedPressure *= UrgencyStickiness; // decay the pressure with time
         m_AccumulatedNormalization *= UrgencyStickiness;
@@ -175,8 +181,8 @@ void UAC_SplineMovementComponent::HandleInterruption(FVector input, float DeltaS
 FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input)
 {
     FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
-
-    nextPointTarget += Input * GetMaxSpeed() * (DeltaT + TargetTime);
+    float magnatude = GetMaxSpeed() * (DeltaT + TargetTime);
+    nextPointTarget += Input * magnatude;
     nextPointTarget.Z = m_Character->GetActorLocation().Z;
     return nextPointTarget;
 }
@@ -188,6 +194,8 @@ float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
 
 void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector& Input)
 {
+    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("  === UpdateSplinePoints   Clear to Commitments"));
+
     m_SplineConfig->ClearToCommitments();
 
     float targetTime = GetCurrentMovementReponseTime();
@@ -198,34 +206,40 @@ void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector
     {
         UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
 
-        // can add additional look ahead points for managing things like Motion Matching here. Note still respect constraints
-        float maxLookahead = ControlLookahead - targetTime;
-
-        const FQuat inputRotation = Input.ToOrientationRotator().Quaternion();
-        const FQuat prevMotionRotation = m_SegmentChordDir.ToOrientationRotator().Quaternion(); // seg chord hasn't been updated yet
-        FQuat deltaRotation = (inputRotation * prevMotionRotation.Inverse()) * InputCurveContinuationFactor;
-        //const FQuat baseRotation = Velocity.ToOrientationRotator().Quaternion();
-        //FQuat deltaRotation = (inputRotation * baseRotation.Inverse()) * InputCurveContinuationFactor;
-
-        FVector stepDir = Input;
-        float stepTime = FMath::Max(targetTime, DeltaT);
-        float stepMaxTime = FMath::Max(MaxMovementResponse, DeltaT);
-
-        while (maxLookahead > 0.0f)
-        {
-            // A consideration here is to move the step time interpolation to the end of the loop, if we want to ensure that the 
-            // first lookahead step is no longer than the first (can improve response in the zero minimum response time case)
-            stepTime = FMath::Lerp(stepTime, stepMaxTime, InputLookaheadBlendout);
-            stepDir = deltaRotation.RotateVector(stepDir);
-            stepTime = FMath::Min(stepTime, maxLookahead);
-            maxLookahead -= stepTime;
-            nextPointTarget = GenerateNewSplinePoint(DeltaT, stepTime, stepDir);
-            UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
-            deltaRotation *= 1.0f - InputCurveContinuationDecay;
-        }
+        FilloutLookahead(Input, targetTime, DeltaT);
     }
     m_SplineConfig->CommitPoint = 3;
 }
+
+
+void UAC_SplineMovementComponent::FilloutLookahead(const FVector& Input, float TargetTime, float DeltaT)
+{
+    // can add additional look ahead points for managing things like Motion Matching here. Note still respect constraints
+    float maxLookahead = ControlLookahead - TargetTime;
+
+    const FQuat inputRotation = Input.ToOrientationRotator().Quaternion();
+    const FQuat prevMotionRotation = m_SegmentChordDir.ToOrientationRotator().Quaternion(); // seg chord hasn't been updated yet
+    const float curveContinuation = m_Launching ? 0.0f : InputCurveContinuationFactor; // set delta rotation to identiy if we're launching
+    FQuat deltaRotation = FMath::Lerp(FQuat::Identity, inputRotation * prevMotionRotation.Inverse(), curveContinuation);
+
+    FVector stepDir = Input;
+    float stepTime = FMath::Max(TargetTime, DeltaT);
+    float stepMaxTime = FMath::Max(MaxMovementResponse, DeltaT);
+
+    while (maxLookahead > 0.0f)
+    {
+        // A consideration here is to move the step time interpolation to the end of the loop, if we want to ensure that the 
+        // first lookahead step is no longer than the first (can improve response in the zero minimum response time case)
+        stepTime = FMath::Lerp(stepTime, stepMaxTime, InputLookaheadBlendout);
+        stepDir = deltaRotation.RotateVector(stepDir);
+        stepTime = FMath::Min(stepTime, maxLookahead);
+        maxLookahead -= stepTime;
+        FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, stepTime, stepDir);
+        UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
+        deltaRotation = FMath::Lerp(deltaRotation, FQuat::Identity, InputCurveContinuationDecay); // no SLERP?!
+    }
+}
+
 
 // This method tries to follow the spline by sampling a point and moving towards it until it's too close, then sampling a new one by updating the 
 //    chord time against the current character projected position or by adding a fixed 'quantum step'.
@@ -444,6 +458,7 @@ void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
 #if !UE_BUILD_SHIPPING
     m_DEBUG_DrawnSegment = -1;
 #endif
+    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("  === ResetSplineState"));
 
     UAC_KBSpline::Reset(m_SplineConfig);
     m_SplineState.Reset();
