@@ -86,7 +86,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             m_UrgencyFactor = FMath::Clamp(m_UrgencyFactor * UrgencyFactor, 0.0f, 1.0f);
 
             constexpr float MinimumSpeedForLaunch = 30.0f; // arbitrary value less than (in cm/s) counts as starting from standing 
-            m_Launching = (m_LastRecordedSpeed <= MinimumSpeedForLaunch) && (m_TimeSinceLastDeflectionChange > (2.0f * MinMovementResponse));
+            m_Launching = m_Launching || (m_LastRecordedSpeed <= MinimumSpeedForLaunch) && (m_TimeSinceLastDeflectionChange > (2.0f * MinMovementResponse));
             UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("== ControlledCharacterMove\n     m_Launching :  %i     m_LastRecordedSpeed :  %f     m_TimeSinceLastDeflectionChange :  %f (2 * %f = %f)"),
                 m_Launching, m_LastRecordedSpeed, m_TimeSinceLastDeflectionChange, MinMovementResponse, (2.0f * MinMovementResponse));
 
@@ -247,6 +247,8 @@ void UAC_SplineMovementComponent::FilloutLookahead(const FVector& Input, float T
 //    that converges on an ideal offset distance
 void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
 {
+    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("  === EvaluateNavigationSpline"));
+
     FVector momentumDir = Velocity.GetSafeNormal();
     FVector targetOffset = m_CurrentMoveTarget - m_Character->GetActorLocation();
     if (bForcePlanerOnly)
@@ -270,6 +272,8 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
             // Current segment isn't good, try and find a good one
             if (!m_SplineState.IsValidSegment())
             {
+                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("       Invalid Segment -- Consume and move to the next one"));
+
                 // try and get a new segment
                 int proposedSegment = m_SplineConfig->GetNextCandidateSegment(m_SplineState.CurrentTraversalSegment);
 
@@ -287,6 +291,7 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
             // Current segment is ok, try and find a good rabbit position
             if (m_SplineState.IsValidSegment())
             {
+                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("       Valid Segment -- Update the rabbit"));
                 FVector candidateTarget;
                 FVector candidateTangent;
                 FVector candidateOfset;
@@ -294,8 +299,11 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
                 // may need to step multiple times through the spline to get a sample point relatively ahead of the character. cubic splines can 'lean' backwards 
                 // if the chords meet at a highly acute angle
                 bool goodRabbit = StepSplineTarget(DeltaT, momentumDir, projectedMomentum, candidateTarget, candidateTangent, candidateOfset);
+                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("***                       m_SplineState.Time: %f     goodRabbit: %i"), m_SplineState.Time, goodRabbit);
+
                 if (m_SplineState.Time <= 1.0f && goodRabbit)
                 {
+                    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("***                             Good rabbit"));
                     m_CurrentMoveTarget = candidateTarget;
                     m_CurrentMoveTangent = candidateTangent;
                     targetOffset = candidateOfset;
@@ -315,6 +323,8 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
 // Run rabbit, run!
 bool UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outTangent, FVector& outOffset)
 {
+    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("  === StepSplineTarget  Run rabbit, RUN!"));
+
     const FVector& fromPoint = m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location;
     FVector currentMoveTarget = m_CurrentMoveTarget;
     FVector tangent = outTangent;
@@ -323,9 +333,11 @@ bool UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& 
     // try and update the point within the segment
     float quantumUpdate = (DeltaT * m_LastRecordedSpeed) / m_CurrentSegLen;
     bool stillTrying = true;
-
+int iter = 0;
     while (stillTrying && m_SplineState.Time <= 1.0f)
     {
+        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("      Iterating: %i"),iter++);
+
         // get the current position on the curve, get tangent here, and use that to estimate the next step along the curve. Then project that against 
         // the chord and normalize to get the new update time (make sure it doesn't go backwards too)
         tangent = UAC_KBSpline::ComputeTangent(m_SplineState);        
@@ -347,8 +359,11 @@ bool UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& 
         float projectedPos = m_SegmentChordDir.Dot(m_Character->GetActorLocation() - fromPoint);
         float targetProjPos = m_SegmentChordDir.Dot(currentMoveTarget - fromPoint);
 
-        // Either the new rabbit point should be ahead of us or farther along the spline. If neither of these is true step again
+        // Either the new rabbit point should be ahead of us or farther along the spline. If neither of these is true step again (test for the opposite conditions)
         stillTrying = (currentProjectedMomentum < 0.0f) && (projectedPos > targetProjPos);
+
+        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("      stillTrying: %i   =    %f < 0  &&  %f > %f"), stillTrying, currentProjectedMomentum, projectedPos, targetProjPos);
+
 #if !UE_BUILD_SHIPPING
         if (CVarAC_SplineDetailedMoveDebug.GetValueOnAnyThread())
         {
@@ -367,10 +382,13 @@ bool UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& 
 
 void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaSeconds)
 {
+    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("      === MoveAlongRail"));
+
     FVector targetMomentumDir = MomentumDir;
     // if we're not moving, don't bother
     if (TargetOffset.SquaredLength() > 0.0f)
     {
+        m_Launching = false; // if this was a start then we've started!
         // we're locking to the rail so clamp the movement 
         if (bForceStayOnRail)
         {
@@ -396,21 +414,22 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         // compute the momentum rail crossing at the move target point do see if we're outside of tollerances
         FVector errorVec = railDir * ((MomentumDir * MomentumDir.Dot(TargetOffset)) - TargetOffset).Dot(railDir);
 
+        const float misalignmentFactor = targetMomentumDir.Dot(TargetOffset) < 0.0f * 0.65f; // add an error factor for going the wrong dirrection
         // 10% fudge factor. Corresponds to the other 10% to effectively make the rail walls a bit thicker
-        constexpr float MinimalError = 0.1f; // we always want a bit of the tangent incorpertated 
-        float elasticError = FMath::Max(MinimalError, errorVec.SquaredLength() / FMath::Square(RailWidth * 0.5f * 0.9f));
-        bool headingCorrectionNeeded = elasticError > 1.0f;
+        const float elasticError = FMath::Max(misalignmentFactor, errorVec.SquaredLength() / FMath::Square(RailWidth * 0.5f * 0.9f));
 
-        // if the error is more than the width of the rail, then aim for the near edge of the rail
-        if (headingCorrectionNeeded)
+        // if the error is more than the width of the rail, then we need a major headding correction. Aim for the near edge of the rail
+        if (elasticError > 1.0f)
         {
+            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT(" XXX     === Major heading Correction Needed"));
             // can do the unsafe normalize since we know it's length is non-zero from the conditional
             errorVec = errorVec.GetUnsafeNormal() * RailWidth * 0.5f;
             targetMomentumDir = (TargetOffset + errorVec).GetSafeNormal();
         }
         else
         {
-            // elstic control. Use the weighted error to blend in the tangent
+            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT(" XXX     === Minor correction only: elasticError: %f"), elasticError);
+            // Minor headding corrections, elstic control. Use the weighted error to blend in the tangent
             // 10% fudge the other way
             FVector tangentDir = UAC_KBSpline::ComputeTangent(m_SplineState).GetSafeNormal(); // this is cachable!
             targetMomentumDir = FMath::Lerp(targetMomentumDir, tangentDir, elasticError * 1.1f);
@@ -478,6 +497,8 @@ void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
     m_CurrentMoveTarget = m_Character->GetActorLocation() + (Velocity * DeltaSeconds);
     m_SegmentChordDir = m_Character->GetActorForwardVector();
     m_CurrentSegLen = m_LastRecordedSpeed * DeltaSeconds;
+
+    m_Launching = false;
 }
 
 
