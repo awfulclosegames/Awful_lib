@@ -38,7 +38,6 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
     m_DEBUG_PosAtStartOfUpdate = m_Character->GetActorLocation();
 #endif
     m_SplineFollowingAcceleration = FVector::ZeroVector;
-UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("== Tick\n     m_LastRecordedSpeed :  %f"), m_LastRecordedSpeed);
 
     m_Interrupted = false;
     bEnabledSplineUpdates = bSplineWalk;
@@ -86,11 +85,8 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             m_UrgencyFactor = FMath::Clamp(m_UrgencyFactor * UrgencyFactor, 0.0f, 1.0f);
 
             constexpr float MinimumSpeedForLaunch = 30.0f; // arbitrary value less than (in cm/s) counts as starting from standing 
-            m_Launching = m_Launching || (m_LastRecordedSpeed <= MinimumSpeedForLaunch) && (m_TimeSinceLastDeflectionChange > (2.0f * MinMovementResponse));
-            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("== ControlledCharacterMove\n     m_Launching :  %i     m_LastRecordedSpeed :  %f     m_TimeSinceLastDeflectionChange :  %f (2 * %f = %f)"),
-                m_Launching, m_LastRecordedSpeed, m_TimeSinceLastDeflectionChange, MinMovementResponse, (2.0f * MinMovementResponse));
+            m_Launching = m_Launching || ((m_LastRecordedSpeed <= MinimumSpeedForLaunch) && (m_TimeSinceLastDeflectionChange > (2.0f * MinMovementResponse)));
 
-            //m_TimeSinceLastDeflectionChange = m_Launching ? 0.0f : m_TimeSinceLastDeflectionChange;
             m_TimeSinceLastDeflectionChange = 0.0f;
             m_Throttle = RequestedSpeedSquared * GetMaxSpeed();
 
@@ -170,8 +166,8 @@ void UAC_SplineMovementComponent::HandleInterruption(FVector input, float DeltaS
                 UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("            targetResponseTime %f"), 
                     targetResponseTime);
                 
-                UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation() + (Velocity * targetResponseTime), 15.0f, FColor::White, TEXT("Interruption"));
-                UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, junctionPoint, 15.0f, FColor::Purple, TEXT("Junction (%f)"), interruptionBias);
+                UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_Character->GetActorLocation() + (Velocity * targetResponseTime), 15, FColor::White, TEXT("Interruption"));
+                UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, junctionPoint, 15, FColor::Purple, TEXT("Junction (%f)"), interruptionBias);
             }
 #endif
         }
@@ -194,8 +190,6 @@ float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
 
 void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector& Input)
 {
-    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("  === UpdateSplinePoints   Clear to Commitments"));
-
     m_SplineConfig->ClearToCommitments();
 
     float targetTime = GetCurrentMovementReponseTime();
@@ -220,7 +214,10 @@ void UAC_SplineMovementComponent::FilloutLookahead(const FVector& Input, float T
     const FQuat inputRotation = Input.ToOrientationRotator().Quaternion();
     const FQuat prevMotionRotation = m_SegmentChordDir.ToOrientationRotator().Quaternion(); // seg chord hasn't been updated yet
     const float curveContinuation = m_Launching ? 0.0f : InputCurveContinuationFactor; // set delta rotation to identiy if we're launching
-    FQuat deltaRotation = FMath::Lerp(FQuat::Identity, inputRotation * prevMotionRotation.Inverse(), curveContinuation);
+    FQuat rawDeltaRotation = inputRotation * prevMotionRotation.Inverse();
+    // combine with the previous update's delta to bias consistency
+    FQuat scaledDeltaRotation = FMath::Lerp(FQuat::Identity, (rawDeltaRotation + m_PrevDelta) * 0.5f, curveContinuation);
+    m_PrevDelta = rawDeltaRotation;
 
     FVector stepDir = Input;
     float stepTime = FMath::Max(TargetTime, DeltaT);
@@ -231,12 +228,12 @@ void UAC_SplineMovementComponent::FilloutLookahead(const FVector& Input, float T
         // A consideration here is to move the step time interpolation to the end of the loop, if we want to ensure that the 
         // first lookahead step is no longer than the first (can improve response in the zero minimum response time case)
         stepTime = FMath::Lerp(stepTime, stepMaxTime, InputLookaheadBlendout);
-        stepDir = deltaRotation.RotateVector(stepDir);
+        stepDir = scaledDeltaRotation.RotateVector(stepDir);
         stepTime = FMath::Min(stepTime, maxLookahead);
         maxLookahead -= stepTime;
         FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, stepTime, stepDir);
         UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
-        deltaRotation = FMath::Lerp(deltaRotation, FQuat::Identity, InputCurveContinuationDecay); // no SLERP?!
+        scaledDeltaRotation = FMath::Lerp(scaledDeltaRotation, FQuat::Identity, InputCurveContinuationDecay); // no SLERP?!
     }
 }
 
@@ -247,8 +244,6 @@ void UAC_SplineMovementComponent::FilloutLookahead(const FVector& Input, float T
 //    that converges on an ideal offset distance
 void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
 {
-    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("  === EvaluateNavigationSpline"));
-
     FVector momentumDir = Velocity.GetSafeNormal();
     FVector targetOffset = m_CurrentMoveTarget - m_Character->GetActorLocation();
     if (bForcePlanerOnly)
@@ -272,8 +267,6 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
             // Current segment isn't good, try and find a good one
             if (!m_SplineState.IsValidSegment())
             {
-                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("       Invalid Segment -- Consume and move to the next one"));
-
                 // try and get a new segment
                 int proposedSegment = m_SplineConfig->GetNextCandidateSegment(m_SplineState.CurrentTraversalSegment);
 
@@ -291,7 +284,6 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
             // Current segment is ok, try and find a good rabbit position
             if (m_SplineState.IsValidSegment())
             {
-                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("       Valid Segment -- Update the rabbit"));
                 FVector candidateTarget;
                 FVector candidateTangent;
                 FVector candidateOfset;
@@ -299,11 +291,9 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
                 // may need to step multiple times through the spline to get a sample point relatively ahead of the character. cubic splines can 'lean' backwards 
                 // if the chords meet at a highly acute angle
                 bool goodRabbit = StepSplineTarget(DeltaT, momentumDir, projectedMomentum, candidateTarget, candidateTangent, candidateOfset);
-                UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("***                       m_SplineState.Time: %f     goodRabbit: %i"), m_SplineState.Time, goodRabbit);
 
                 if (m_SplineState.Time <= 1.0f && goodRabbit)
                 {
-                    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("***                             Good rabbit"));
                     m_CurrentMoveTarget = candidateTarget;
                     m_CurrentMoveTangent = candidateTangent;
                     targetOffset = candidateOfset;
@@ -323,8 +313,6 @@ void UAC_SplineMovementComponent::EvaluateNavigationSpline(float DeltaT)
 // Run rabbit, run!
 bool UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& MomentumDir, float& outProjectedMomentum, FVector& outTarge, FVector& outTangent, FVector& outOffset)
 {
-    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("  === StepSplineTarget  Run rabbit, RUN!"));
-
     const FVector& fromPoint = m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location;
     FVector currentMoveTarget = m_CurrentMoveTarget;
     FVector tangent = outTangent;
@@ -333,11 +321,9 @@ bool UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& 
     // try and update the point within the segment
     float quantumUpdate = (DeltaT * m_LastRecordedSpeed) / m_CurrentSegLen;
     bool stillTrying = true;
-int iter = 0;
+
     while (stillTrying && m_SplineState.Time <= 1.0f)
     {
-        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("      Iterating: %i"),iter++);
-
         // get the current position on the curve, get tangent here, and use that to estimate the next step along the curve. Then project that against 
         // the chord and normalize to get the new update time (make sure it doesn't go backwards too)
         tangent = UAC_KBSpline::ComputeTangent(m_SplineState);        
@@ -362,12 +348,10 @@ int iter = 0;
         // Either the new rabbit point should be ahead of us or farther along the spline. If neither of these is true step again (test for the opposite conditions)
         stillTrying = (currentProjectedMomentum < 0.0f) && (projectedPos > targetProjPos);
 
-        UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("      stillTrying: %i   =    %f < 0  &&  %f > %f"), stillTrying, currentProjectedMomentum, projectedPos, targetProjPos);
-
 #if !UE_BUILD_SHIPPING
         if (CVarAC_SplineDetailedMoveDebug.GetValueOnAnyThread())
         {
-            UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, currentMoveTarget, 3.0f, stillTrying ? FColor::Black : FColor::Magenta, TEXT("Potential Rabbit"));
+            UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, currentMoveTarget, 3, stillTrying ? FColor::Black : FColor::Magenta, TEXT("Potential Rabbit"));
         }
 #endif
     }
@@ -382,8 +366,6 @@ int iter = 0;
 
 void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVector& TargetOffset, float DeltaSeconds)
 {
-    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("      === MoveAlongRail"));
-
     FVector targetMomentumDir = MomentumDir;
     // if we're not moving, don't bother
     if (TargetOffset.SquaredLength() > 0.0f)
@@ -421,14 +403,12 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         // if the error is more than the width of the rail, then we need a major headding correction. Aim for the near edge of the rail
         if (elasticError > 1.0f)
         {
-            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT(" XXX     === Major heading Correction Needed"));
             // can do the unsafe normalize since we know it's length is non-zero from the conditional
             errorVec = errorVec.GetUnsafeNormal() * RailWidth * 0.5f;
             targetMomentumDir = (TargetOffset + errorVec).GetSafeNormal();
         }
         else
         {
-            UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT(" XXX     === Minor correction only: elasticError: %f"), elasticError);
             // Minor headding corrections, elstic control. Use the weighted error to blend in the tangent
             // 10% fudge the other way
             FVector tangentDir = UAC_KBSpline::ComputeTangent(m_SplineState).GetSafeNormal(); // this is cachable!
@@ -440,7 +420,7 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         {      
             for (int wsPt = 0; wsPt < FKBSplineState::NumberOfPoints; ++wsPt)
             {
-                UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_SplineState.WorkingSet[wsPt].Location, 6.0f, FColor::Orange, TEXT(""));
+                UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_SplineState.WorkingSet[wsPt].Location, 6, FColor::Orange, TEXT(""));
             }
 
             FVector debug_MomentumRailCrossing = railDir * ((MomentumDir * MomentumDir.Dot(TargetOffset)) - TargetOffset).Dot(railDir);
@@ -477,7 +457,6 @@ void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
 #if !UE_BUILD_SHIPPING
     m_DEBUG_DrawnSegment = -1;
 #endif
-    UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("  === ResetSplineState"));
 
     UAC_KBSpline::Reset(m_SplineConfig);
     m_SplineState.Reset();
@@ -498,6 +477,7 @@ void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
     m_SegmentChordDir = m_Character->GetActorForwardVector();
     m_CurrentSegLen = m_LastRecordedSpeed * DeltaSeconds;
 
+    m_PrevDelta = FQuat::Identity;
     m_Launching = false;
 }
 
@@ -512,7 +492,7 @@ void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
     int ctrlIdx = 0;
     for (auto& ctrlpt : m_SplineConfig->ControlPoints)
     {
-        UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, ctrlpt.Location, 10.0f, FColor::Black, TEXT("[%i]"), ctrlIdx++);
+        UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, ctrlpt.Location, 10, FColor::Black, TEXT("[%i]"), ctrlIdx++);
     }
 
     UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("*****************************\n        TICK\n*****************************\n        Segment: %i (isValid: %s)\n        Commit: %i\n        m_CurrentMoveTarget: %s\n        targetOffset: %s\n         Current Time: %f\n*****************************"),
@@ -527,18 +507,18 @@ void UAC_SplineMovementComponent::DebugDrawEvaluateForVelocity(float DeltaT)
     
     UE_VLOG(GetOwner(), LogSplineMovement, Verbose, TEXT("Character location at the start of tick:  %s\n                             Currently :  %s"), *m_DEBUG_PosAtStartOfUpdate.ToString(), *m_Character->GetActorLocation().ToString());
 
-    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location, 1.0f, FColor::Green, TEXT("From"));
-    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_SplineState.WorkingSet[FKBSplineState::ToPoint].Location, 1.0f, FColor::Red, TEXT("To"));
+    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_SplineState.WorkingSet[FKBSplineState::FromPoint].Location, 1, FColor::Green, TEXT("From"));
+    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_SplineState.WorkingSet[FKBSplineState::ToPoint].Location, 1, FColor::Red, TEXT("To"));
 
-    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, 1.5f, FColor::Blue, TEXT("Loc"));
-    UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), FColor::Black, 4.0f, TEXT(""));
+    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, 2, FColor::Blue, TEXT("Loc"));
+    UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), FColor::Black, 4, TEXT(""));
 
 
 
-    UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), FColor::Purple, 3.0f, TEXT("Vel Step"));
-    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), 1.0f, FColor::Red, TEXT("Vel Step"));
-    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + (m_DEBUG_ComputedVelocity * DeltaT), 1.0f, FColor::Cyan, TEXT("Computed Vel Step"));
-    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_CurrentMoveTarget, 1.0f, FColor::Purple, TEXT("Rabbit"));
+    UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), FColor::Purple, 3, TEXT("Vel Step"));
+    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + (Velocity * DeltaT), 1, FColor::Red, TEXT("Vel Step"));
+    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate + (m_DEBUG_ComputedVelocity * DeltaT), 1, FColor::Cyan, TEXT("Computed Vel Step"));
+    UE_VLOG_LOCATION(GetOwner(), LogSplineMovement, Verbose, m_CurrentMoveTarget, 1, FColor::Purple, TEXT("Rabbit"));
 
     if (CVarAC_SplineDetailedMoveDebug.GetValueOnAnyThread())
     {

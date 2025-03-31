@@ -212,6 +212,7 @@ private:
 	FVector m_CurrentMoveTarget;
 	FVector m_CurrentMoveTangent;
 	FVector m_SegmentChordDir;
+	FQuat m_PrevDelta;
 
 	int m_LastValidSegment = 0;
 	float m_CurrentSegLen = 1.0f;
