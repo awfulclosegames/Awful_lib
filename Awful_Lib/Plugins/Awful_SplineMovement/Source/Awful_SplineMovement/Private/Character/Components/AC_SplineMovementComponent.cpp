@@ -318,8 +318,9 @@ bool UAC_SplineMovementComponent::StepSplineTarget(float DeltaT, const FVector& 
     FVector tangent = outTangent;
     FVector currentOffset = outOffset;
     float currentProjectedMomentum = outProjectedMomentum;
-    // try and update the point within the segment
-    float quantumUpdate = (DeltaT * m_LastRecordedSpeed) / m_CurrentSegLen;
+    // try and update the point within the segment. The quantum update must be non-zero. Arbitrary min speed of 10 cm/s
+    // To be fully proprer this should probably be min of last speed and throttle, then early out the loop if it's zero
+    float quantumUpdate = (DeltaT * FMath::Max(m_LastRecordedSpeed, 10.0f)) / m_CurrentSegLen;
     bool stillTrying = true;
 
     while (stillTrying && m_SplineState.Time <= 1.0f)
@@ -443,6 +444,8 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         FVector currentVel = TurnRateVel + (Acceleration * DeltaSeconds);
 
         m_SplineFollowingAcceleration = ((targetMomentumDir * (m_Throttle)) - currentVel) / DeltaSeconds;
+        float maxAccel = GetMaxAcceleration();
+        m_SplineFollowingAcceleration.GetClampedToSize(-maxAccel, maxAccel);
 
 #if !UE_BUILD_SHIPPING
         m_DEBUG_ComputedVelocity = targetMomentumDir * m_Throttle;
@@ -576,7 +579,9 @@ void UAC_SplineMovementComponent::PerformMovement(float DeltaTime)
 
 void UAC_SplineMovementComponent::CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration)
 {
-    Super::CalcVelocity(DeltaTime, Friction, bFluid, BrakingDeceleration);
+    // we want deceleration to break in 0.1s or the passed in deceleration, whichever is more
+    float desiredBreaking = FMath::Max(m_LastRecordedSpeed / TimeToStop, BrakingDeceleration);
+    Super::CalcVelocity(DeltaTime, Friction, bFluid, desiredBreaking);
 
     Velocity += m_SplineFollowingAcceleration * DeltaTime;
 }

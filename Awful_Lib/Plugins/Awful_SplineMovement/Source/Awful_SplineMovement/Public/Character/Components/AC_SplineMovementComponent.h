@@ -126,6 +126,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
 	float MaxMovementResponse = 0.5f;
 
+
+	/// <summary>
+	/// How long, in seconds, before the character comes to a complete stop. If this would end up being slower than
+	/// the breaking deceleration, then that time will be used instead
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
+	float TimeToStop = 0.3f;
+
+
 	/// <summary>
 	/// A factor applied to new movements (either starting from a stop, or interrupting a current movement)
 	/// </summary>
