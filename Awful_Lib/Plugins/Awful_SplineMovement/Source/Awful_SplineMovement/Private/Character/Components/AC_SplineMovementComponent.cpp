@@ -67,7 +67,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 
     if (bEnabledSplineUpdates && (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER))
     {
-        float deflectionDeltaV = (1.0f - m_SegmentChordDir.Dot(input)) * GetMaxSpeed();
+        float deflectionDeltaV = (1.0f - Velocity.GetSafeNormal().Dot(input)) * GetMaxSpeed();
 
         if (deflectionDeltaV > (ResponseTollerance * GetMaxSpeed()))
         {
@@ -561,8 +561,13 @@ FRotator UAC_SplineMovementComponent::ComputeOrientToMovementRotation(const FRot
 {
     if (bEnabledSplineUpdates && m_SplineState.IsValidSegment())
     {
-        FRotator nextRotation = FMath::Lerp(CurrentRotation, Velocity.Rotation(), RotationBlendRate);
-        return nextRotation;
+        FRotator DeltaR = Velocity.Rotation() - CurrentRotation;
+        FRotator ClampedDeltaR(
+            FMath::Min(DeltaR.Pitch, RotationRate.Pitch),
+            FMath::Min(DeltaR.Yaw, RotationRate.Yaw),
+            FMath::Min(DeltaR.Roll, RotationRate.Roll)
+        );
+        return CurrentRotation + ClampedDeltaR;
     }
 
     return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);

@@ -37,12 +37,6 @@ public:
 	float MoveBias = 0.0f;
 
 	/// <summary>
-	/// How quickly we align the rotation to the splines desired rotation
-	/// </summary>
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
-	float RotationBlendRate = 0.25f;
-
-	/// <summary>
 	/// how tightly do we pull the spline in to the chord. Range is 1..-infinity
 	/// 1 is fully pulled in to the chord, moving in a straight line
 	/// 0 is natural curvature.
