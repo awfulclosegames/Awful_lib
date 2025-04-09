@@ -126,8 +126,7 @@ public:
 	/// the breaking deceleration, then that time will be used instead
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
-	float TimeToStop = 0.3f;
-
+	float TimeToStop = 0.2f;
 
 	/// <summary>
 	/// A factor applied to new movements (either starting from a stop, or interrupting a current movement)
@@ -135,7 +134,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
 	float LaunchForce = 0.5f;
 
-
+	/// <summary>
+	/// Controles how fast the throttle moves to a new target position. 
+	///  0 Means instantly take the new throttle value
+	///  1 means NEVER take the new throttle value
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
+	float ThrottleEnertia = 0.2f;
 
 	/// <summary>
 	/// How much of a change of input is required to pick a new spline control point (dead zone). Range = 0..1
@@ -221,6 +226,7 @@ private:
 	float m_CurrentSegLen = 1.0f;
 
 	float m_Throttle = 0.0f;
+	float m_AccumulatedThrottle = 0.0f;
 	float m_LastRecordedSpeed = 0.0f;
 	float m_UrgencyFactor = 0.0f;
 

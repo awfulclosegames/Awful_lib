@@ -67,14 +67,14 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
 
     if (bEnabledSplineUpdates && (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER))
     {
-        float deflectionDeltaV = (1.0f - Velocity.GetSafeNormal().Dot(input)) * GetMaxSpeed();
+        float deflectionDeltaVSqr = ((input * GetMaxSpeed()) - Velocity).SquaredLength();
 
-        if (deflectionDeltaV > (ResponseTollerance * GetMaxSpeed()))
+        if (deflectionDeltaVSqr > FMath::Square(ResponseTollerance * GetMaxSpeed()))
         {
             m_CachedDeflection = input.GetUnsafeNormal() * RequestedSpeedSquared;
             // pressure is based on kinetic energy which is 0.5f * mass * vel^2. Assume a constant mass and pressure is proportional to the square of velocity
             // since the delta is computed from velocities it is already a square velocity... though in inconvenient units since energy is usually computed in m/s not cm/s
-            m_AccumulatedPressure += FMath::Square(deflectionDeltaV);
+            m_AccumulatedPressure += deflectionDeltaVSqr;
             // normalized against the maximum possible delta V (from max speed in one direction to max speed in the opposite direction) and compensated for the accumulation
             // We don't actually want to normalize against the full delta v range since the top end is rarely used and it throws off the urgency so we use 75% of it (the coverage)
             m_AccumulatedNormalization += FMath::Square(m_MaxDeltaVMultiplier * GetMaxSpeed());
@@ -88,7 +88,9 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             m_Launching = m_Launching || ((m_LastRecordedSpeed <= MinimumSpeedForLaunch) && (m_TimeSinceLastDeflectionChange > (2.0f * MinMovementResponse)));
 
             m_TimeSinceLastDeflectionChange = 0.0f;
-            m_Throttle = RequestedSpeedSquared * GetMaxSpeed();
+            float currentThrottleValue = RequestedSpeedSquared * GetMaxSpeed();
+            m_Throttle = FMath::Lerp(currentThrottleValue, m_AccumulatedThrottle, ThrottleEnertia);
+            m_AccumulatedThrottle = m_Throttle;
 
             HandleInterruption(m_CachedDeflection, DeltaSeconds);
         }
@@ -103,7 +105,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
         {
             if (bSplineWalk)
             {
-                UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (input * 100), FColor::White, 8.0f, TEXT("Input (DeltaV: %f)"), deflectionDeltaV);
+                UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (input * 100), FColor::White, 8.0f, TEXT("Input (DeltaV: %f)"), FMath::Square(deflectionDeltaVSqr));
                 UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (m_SegmentChordDir * 100), FColor::Yellow, 8.0f, TEXT("Current Travel Target"));
                 
                 FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
@@ -127,6 +129,9 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
     {
         ResetSplineState(DeltaSeconds);
     }
+
+    // decay the accumulation over time regardless of input 
+    m_AccumulatedThrottle *= 0.9f;
 
     Super::ControlledCharacterMove(input, DeltaSeconds);
 }
