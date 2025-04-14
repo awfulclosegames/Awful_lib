@@ -64,6 +64,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
     const float RequestedSpeedSquared = input.SizeSquared();
 
     m_TimeSinceLastDeflectionChange += DeltaSeconds;
+    float currentThrottleAccumulationDecay = 1.0f - ThrottleAccumulationDecay;
 
     if (bEnabledSplineUpdates && (RequestedSpeedSquared > UE_KINDA_SMALL_NUMBER))
     {
@@ -91,6 +92,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             float currentThrottleValue = RequestedSpeedSquared * GetMaxSpeed();
             m_Throttle = FMath::Lerp(currentThrottleValue, m_AccumulatedThrottle, ThrottleEnertia);
             m_AccumulatedThrottle = m_Throttle;
+            currentThrottleAccumulationDecay = 1.0f; // don't decay on an update where we set a throttle value
 
             HandleInterruption(m_CachedDeflection, DeltaSeconds);
         }
@@ -131,7 +133,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
     }
 
     // decay the accumulation over time regardless of input 
-    m_AccumulatedThrottle *= 0.9f;
+    m_AccumulatedThrottle *= currentThrottleAccumulationDecay;
 
     Super::ControlledCharacterMove(input, DeltaSeconds);
 }

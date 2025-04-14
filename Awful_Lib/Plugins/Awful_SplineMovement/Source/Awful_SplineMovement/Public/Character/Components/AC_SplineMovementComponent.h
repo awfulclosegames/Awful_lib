@@ -57,6 +57,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
 	float InputCurveContinuationFactor = 0.9;
 
+
+	/// <summary>
+	/// How fast the the throttle forgets it's steady state when idle. Ranges between 0..1
+	/// Works in conjunciont with throttle enertia. Longer memory will improve responsiveness
+	/// by expecting a fast movement for longer after a fast movement has happened.
+	/// shorter memory improves smoothness
+	/// 0 means never forget
+	/// 1 means forget immediatly 
+	/// </summary>
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
+	float ThrottleAccumulationDecay = 0.7f;
+
+
 	/// <summary>
 	/// The rate at which we lengthen the lookahead segments from the current input segment length
 	/// Range 0..1
@@ -143,7 +156,7 @@ public:
 	///  1 means NEVER take the new throttle value
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Response")
-	float ThrottleEnertia = 0.2f;
+	float ThrottleEnertia = 0.7f;
 
 	/// <summary>
 	/// How much of a change of input is required to pick a new spline control point (dead zone). Range = 0..1
