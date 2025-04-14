@@ -109,7 +109,7 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
                 UE_VLOG_SEGMENT_THICK(GetOwner(), LogSplineMovement, Verbose, m_DEBUG_PosAtStartOfUpdate, m_DEBUG_PosAtStartOfUpdate + (m_SegmentChordDir * 100), FColor::Yellow, 8.0f, TEXT("Current Travel Target"));
                 
                 FVector RequestedTarget = input * GetMaxSpeed() * ControlLookahead;
-                FVector MovementResponseTarget = input * GetMaxSpeed() * (DeltaSeconds + GetCurrentMovementReponseTime());
+                FVector MovementResponseTarget = input * GetMaxSpeed() * (DeltaSeconds + GetCurrentMovementReponseTime(MinMovementResponse, MaxMovementResponse));
                 RequestedTarget.Z = 0.0f;
                 MovementResponseTarget.Z = 0.0f;
                 FColor urgencyColor = m_Interrupted ? FColor::Red : FColor::Blue;
@@ -188,16 +188,18 @@ FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, float 
     return nextPointTarget;
 }
 
-float UAC_SplineMovementComponent::GetCurrentMovementReponseTime() const
+float UAC_SplineMovementComponent::GetCurrentMovementReponseTime(float Min, float Max) const
 {
-    return FMath::Clamp((MinMovementResponse + m_TimeSinceLastDeflectionChange) * (1.0f - m_UrgencyFactor), MinMovementResponse, MaxMovementResponse);
+    return FMath::Clamp((Min + m_TimeSinceLastDeflectionChange) * (1.0f - m_UrgencyFactor), Min, Max);
 }
+
+
 
 void UAC_SplineMovementComponent::UpdateSplinePoints(float DeltaT, const FVector& Input)
 {
     m_SplineConfig->ClearToCommitments();
 
-    float targetTime = GetCurrentMovementReponseTime();
+    float targetTime = GetCurrentMovementReponseTime(MinMovementResponse, MaxMovementResponse);
 
     FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, targetTime, Input);
     // enforce minimum spline point spacing
@@ -236,8 +238,8 @@ void UAC_SplineMovementComponent::FilloutLookahead(const FVector& Input, float T
         stepDir = scaledDeltaRotation.RotateVector(stepDir);
         stepTime = FMath::Min(stepTime, maxLookahead);
         maxLookahead -= stepTime;
-        FVector nextPointTarget = GenerateNewSplinePoint(DeltaT, stepTime, stepDir);
-        UAC_KBSpline::AddSplinePoint(m_SplineConfig, { nextPointTarget , MoveTensioning, MoveBias });
+        m_CurrentLookaheadPoint = GenerateNewSplinePoint(DeltaT, stepTime, stepDir);
+        UAC_KBSpline::AddSplinePoint(m_SplineConfig, { m_CurrentLookaheadPoint , MoveTensioning, MoveBias });
         scaledDeltaRotation = FMath::Lerp(scaledDeltaRotation, FQuat::Identity, InputCurveContinuationDecay); // no SLERP?!
     }
 }
@@ -487,6 +489,8 @@ void UAC_SplineMovementComponent::ResetSplineState(float DeltaSeconds)
 
     m_PrevDelta = FQuat::Identity;
     m_Launching = false;
+
+    m_CurrentLookaheadPoint = m_CurrentMoveTarget;
 }
 
 
@@ -590,6 +594,7 @@ void UAC_SplineMovementComponent::PerformMovement(float DeltaTime)
 void UAC_SplineMovementComponent::CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration)
 {
     // we want deceleration to break in 0.1s or the passed in deceleration, whichever is more
+    float TimeToStop = GetCurrentMovementReponseTime(MinTimeToStop, MaxTimeToStop);
     float desiredBreaking = FMath::Max(m_LastRecordedSpeed / TimeToStop, BrakingDeceleration);
     Super::CalcVelocity(DeltaTime, Friction, bFluid, desiredBreaking);
 
@@ -604,5 +609,15 @@ void UAC_SplineMovementComponent::HandleImpact(const FHitResult& Hit, float Time
         ResetSplineState(TimeSlice);
     }
     Super::HandleImpact(Hit, TimeSlice, MoveDelta);
+}
+
+FVector UAC_SplineMovementComponent::GetLookaheadPoint() const
+{
+    return m_CurrentLookaheadPoint;
+}
+
+bool UAC_SplineMovementComponent::IsTryingToMove() const
+{
+    return m_LastRecordedSpeed > UE_SMALL_NUMBER;
 }
 

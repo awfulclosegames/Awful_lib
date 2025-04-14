@@ -126,7 +126,10 @@ public:
 	/// the breaking deceleration, then that time will be used instead
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
-	float TimeToStop = 0.2f;
+	float MinTimeToStop = 0.07f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
+	float MaxTimeToStop = 0.3f;
 
 	/// <summary>
 	/// A factor applied to new movements (either starting from a stop, or interrupting a current movement)
@@ -189,11 +192,17 @@ public:
 	virtual void CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration) override;
 
 	virtual void HandleImpact(const FHitResult& Hit, float TimeSlice = 0.f, const FVector& MoveDelta = FVector::ZeroVector) override;
+	
+	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
+	FVector GetLookaheadPoint() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
+	bool IsTryingToMove() const;
 
 protected:
 	// Adding a new point into the control point stream. virtual so derived classes can provide whatever point generating logic they like
 	virtual FVector GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input);
-	virtual float GetCurrentMovementReponseTime() const;
+	virtual float GetCurrentMovementReponseTime(float Min, float Max) const;
 
 private:
 	void HandleInterruption(FVector input, float DeltaSeconds);
@@ -241,6 +250,9 @@ private:
 	bool m_Interrupted = false;
 	const float m_InterruptionUrgencyReductionFactor = 0.5f;
 	const float m_MaxDeltaVMultiplier = 2.0f; // 2.0 would be going from full speed one way to full speed 180 degrees.
+	
+	// Temp for handling lookahead. Should be a query on time that walks the spline
+	FVector m_CurrentLookaheadPoint;
 
 	bool bEnabledSplineUpdates = false;
 #if !UE_BUILD_SHIPPING
