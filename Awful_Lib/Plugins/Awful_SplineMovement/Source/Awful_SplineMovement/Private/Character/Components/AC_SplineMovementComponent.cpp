@@ -60,7 +60,9 @@ void UAC_SplineMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick
 
 void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds)
 {
-    FVector input = InputVector.GetClampedToMaxSize(1.0f);
+    // the m_ThrottleNomralization has the side effect of increasing (or decreasing) the deflection delta and the accumulated pressure 
+    // based on normalization. We may want to only apply this against the throttle computation (currentThrottleValue)
+    FVector input = (InputVector * m_ThrottleNomralization).GetClampedToMaxSize(1.0f);
     const float RequestedSpeedSquared = input.SizeSquared();
 
     m_TimeSinceLastDeflectionChange += DeltaSeconds;

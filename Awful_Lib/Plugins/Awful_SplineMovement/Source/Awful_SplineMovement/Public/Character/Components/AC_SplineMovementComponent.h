@@ -212,6 +212,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
 	bool IsTryingToMove() const;
 
+	/// <summary>
+	/// Allows for the game to set ranges for speeds (like walk up to 70% deflection jog to 95%) and make full use of the throttle range
+	/// </summary>
+	UFUNCTION(BlueprintCallable, Category = "Advanced Spline Movement")
+	void SetThrottleNormalization(float NewNormal) { m_ThrottleNomralization = 1.0f / (NewNormal + UE_SMALL_NUMBER); }
+
 protected:
 	// Adding a new point into the control point stream. virtual so derived classes can provide whatever point generating logic they like
 	virtual FVector GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input);
@@ -249,6 +255,7 @@ private:
 
 	float m_Throttle = 0.0f;
 	float m_AccumulatedThrottle = 0.0f;
+	float m_ThrottleNomralization = 1.0f;
 	float m_LastRecordedSpeed = 0.0f;
 	float m_UrgencyFactor = 0.0f;
 
