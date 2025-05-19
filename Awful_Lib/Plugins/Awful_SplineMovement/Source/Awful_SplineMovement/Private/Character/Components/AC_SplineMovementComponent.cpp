@@ -28,7 +28,7 @@ void UAC_SplineMovementComponent::BeginPlay()
     ensure(IsValid(m_Character));
 
     m_SplineConfig = UAC_KBSpline::CreateSplineConfig(m_Character->GetActorLocation() - (m_Character->GetActorForwardVector() * GetMaxSpeed() * MaxMovementResponse));
-
+    DesiredBreakingForce = BrakingFriction;
     ResetSplineState();
 }
 
@@ -91,14 +91,15 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             m_Launching = m_Launching || ((m_LastRecordedSpeed <= MinimumSpeedForLaunch) && (m_TimeSinceLastDeflectionChange > (2.0f * MinMovementResponse)));
 
             m_TimeSinceLastDeflectionChange = 0.0f;
-            float currentThrottleValue = RequestedSpeedSquared * GetMaxSpeed();
-            m_Throttle = FMath::Lerp(currentThrottleValue, m_AccumulatedThrottle, ThrottleEnertia);
-            m_AccumulatedThrottle = m_Throttle;
-            currentThrottleAccumulationDecay = 1.0f; // don't decay on an update where we set a throttle value
 
             HandleInterruption(m_CachedDeflection, DeltaSeconds);
         }
 
+        // Update the throttle as long as there seems to be active input
+        float currentThrottleValue = RequestedSpeedSquared * GetMaxSpeed();
+        m_Throttle = FMath::Lerp(currentThrottleValue, m_AccumulatedThrottle, ThrottleEnertia);
+        m_AccumulatedThrottle = m_Throttle;
+        currentThrottleAccumulationDecay = 1.0f; // don't decay on an update where we set a throttle value
 
         m_AccumulatedPressure *= UrgencyStickiness; // decay the pressure with time
         m_AccumulatedNormalization *= UrgencyStickiness;
@@ -599,8 +600,8 @@ void UAC_SplineMovementComponent::CalcVelocity(float DeltaTime, float Friction, 
 {
     // we want deceleration to break in 0.1s or the passed in deceleration, whichever is more
     float TimeToStop = GetCurrentMovementReponseTime(MinTimeToStop, MaxTimeToStop);
-    float desiredBreaking = FMath::Max(m_LastRecordedSpeed / TimeToStop, BrakingDeceleration);
-    Super::CalcVelocity(DeltaTime, Friction, bFluid, desiredBreaking);
+    DesiredBreakingForce = FMath::Max(m_LastRecordedSpeed / TimeToStop, BrakingDeceleration);
+    Super::CalcVelocity(DeltaTime, Friction, bFluid, DesiredBreakingForce);
 
     Velocity += m_SplineFollowingAcceleration * DeltaTime;
 }

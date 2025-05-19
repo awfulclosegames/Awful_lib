@@ -191,6 +191,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Input")
 	float UrgencyStickiness = 0.5f;
 
+	UPROPERTY()
+	float DesiredBreakingForce;
+
 	virtual void BeginPlay() override;
 
 	virtual void ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds) override;
@@ -217,6 +220,8 @@ public:
 	/// </summary>
 	UFUNCTION(BlueprintCallable, Category = "Advanced Spline Movement")
 	void SetThrottleNormalization(float NewNormal) { m_ThrottleNomralization = 1.0f / (NewNormal + UE_SMALL_NUMBER); }
+	
+	float GetLastRecordedSpeed() const { return m_LastRecordedSpeed; }
 
 protected:
 	// Adding a new point into the control point stream. virtual so derived classes can provide whatever point generating logic they like
