@@ -184,6 +184,15 @@ void UAC_SplineMovementComponent::HandleInterruption(FVector input, float DeltaS
     }
 }
 
+void UAC_SplineMovementComponent::SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode)
+{
+    Super::SetMovementMode(NewMovementMode, NewCustomMode);
+    if (bDisableWhenInAir)
+    {
+        bEnabledSplineUpdates = bEnabledSplineUpdates && !(MovementMode == MOVE_Falling || MovementMode == MOVE_Flying);
+    }
+}
+
 FVector UAC_SplineMovementComponent::GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input)
 {
     FVector nextPointTarget = m_SplineConfig->ControlPoints.Last().Location;
@@ -452,10 +461,12 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
         // "Estimate" what the Unreal character move component is going to do for applying accelerations with ground force
         // so we can generate an acceleration that should get us at least close to our desired velocity
         const FVector AccelDir = Acceleration.GetSafeNormal();
-        FVector TurnRateVel = Velocity - (Velocity - AccelDir * m_LastRecordedSpeed) * FMath::Min(DeltaSeconds * GroundFriction, 1.f);
-        FVector currentVel = TurnRateVel + (Acceleration * DeltaSeconds);
+        // NOTE: This formula is cut and pasted from the Unreal movement compopnent (?!)
+        // remove groundfriction along the acceleration vector then re-add the accleration in to the velocity estimate
+        FVector estimatedCurrentVel = Velocity - ((Velocity - AccelDir * m_LastRecordedSpeed) * FMath::Min(DeltaSeconds * GroundFriction, 1.f));
+        // now compute a move that assumes we also want to compensate for the ground friction drag
 
-        m_SplineFollowingAcceleration = ((targetMomentumDir * (m_Throttle)) - currentVel) / DeltaSeconds;
+        m_SplineFollowingAcceleration = ((targetMomentumDir * (m_Throttle)) - estimatedCurrentVel) / DeltaSeconds;
         float maxAccel = GetMaxAcceleration();
         m_SplineFollowingAcceleration.GetClampedToSize(-maxAccel, maxAccel);
 

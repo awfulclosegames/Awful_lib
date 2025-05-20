@@ -222,7 +222,7 @@ public:
 	void SetThrottleNormalization(float NewNormal) { m_ThrottleNomralization = 1.0f / (NewNormal + UE_SMALL_NUMBER); }
 	
 	float GetLastRecordedSpeed() const { return m_LastRecordedSpeed; }
-
+	virtual void SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode = 0) override;
 protected:
 	// Adding a new point into the control point stream. virtual so derived classes can provide whatever point generating logic they like
 	virtual FVector GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input);
