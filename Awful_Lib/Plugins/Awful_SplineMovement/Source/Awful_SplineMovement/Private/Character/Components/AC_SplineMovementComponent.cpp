@@ -91,7 +91,6 @@ void UAC_SplineMovementComponent::ControlledCharacterMove(const FVector& InputVe
             m_Launching = m_Launching || ((m_LastRecordedSpeed <= MinimumSpeedForLaunch) && (m_TimeSinceLastDeflectionChange > (2.0f * MinMovementResponse)));
 
             m_TimeSinceLastDeflectionChange = 0.0f;
-
             HandleInterruption(m_CachedDeflection, DeltaSeconds);
         }
 
