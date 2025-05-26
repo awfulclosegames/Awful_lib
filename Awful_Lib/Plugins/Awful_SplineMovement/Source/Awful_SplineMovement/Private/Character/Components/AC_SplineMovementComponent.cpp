@@ -467,7 +467,7 @@ void UAC_SplineMovementComponent::MoveAlongRail(const FVector& MomentumDir, FVec
 
         m_SplineFollowingAcceleration = ((targetMomentumDir * (m_Throttle)) - estimatedCurrentVel) / DeltaSeconds;
         float maxAccel = GetMaxAcceleration();
-        m_SplineFollowingAcceleration.GetClampedToSize(-maxAccel, maxAccel);
+        m_SplineFollowingAcceleration = m_SplineFollowingAcceleration.GetClampedToSize(-maxAccel, maxAccel);
 
 #if !UE_BUILD_SHIPPING
         m_DEBUG_ComputedVelocity = targetMomentumDir * m_Throttle;
