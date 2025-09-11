@@ -47,7 +47,7 @@ void UAC_KBSpline::Reset(UKBSplineConfig* Config)
 	Config->SegmentBounds.Empty();
 }
 
-void UAC_KBSpline::GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord)
+void UAC_KBSpline::GetChord(const UKBSplineConfig* Config, int SegmentID, FVector& outChord)
 {
 	if (IsValid(Config))
 	{
@@ -66,7 +66,7 @@ void UAC_KBSpline::AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds
 	}
 }
 
-FKBSplineState UAC_KBSpline::PrepareForEvaluation(UKBSplineConfig* Config, int PointID )
+FKBSplineState UAC_KBSpline::PrepareForEvaluation(const UKBSplineConfig* Config, int PointID )
 {
 	if (IsValid(Config) && Config->IsValidSegment(PointID))
 	{
@@ -116,6 +116,33 @@ FVector UAC_KBSpline::SampleExplicit(FKBSplineState State, float Time)
 	return SamplePoint;
 }
 
+#if !UE_BUILD_SHIPPING
+void UAC_KBSpline::DrawDebugSegment(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour, float Width, float DisplayTime)
+{
+	if (IsValid(Actor) && IsValid(Config))
+	{
+		if (Config->IsValidSegment(State.CurrentTraversalSegment))
+		{
+			int normalizedSegment = Config->NormalizeSegmentID(State.CurrentTraversalSegment);
+			const FVector TraversalStart = Config->ControlPoints[normalizedSegment].Location;
+
+			int CPIdx = normalizedSegment - 1;
+
+			float step = 0.01f;
+			FVector prev = TraversalStart;
+			for (float Time = 0.0f; Time <= 1.0f; Time += step)
+			{
+				FVector sample = SampleExplicit(State, Time);
+				DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, DisplayTime, 0.0f, Width);
+				prev = sample;
+			}
+
+			DrawDebugConstraints(Actor, Config, State);
+		}
+	}
+}
+#endif
+
 void UAC_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour, float Width, float DisplayTime)
 {
 #if !UE_BUILD_SHIPPING
@@ -136,24 +163,7 @@ void UAC_KBSpline::DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSp
 			++CurrentIndex;
 		}
 
-		if (Config->IsValidSegment(State.CurrentTraversalSegment))
-		{
-			int normalizedSegment = Config->NormalizeSegmentID(State.CurrentTraversalSegment);
-			const FVector TraversalStart = Config->ControlPoints[normalizedSegment].Location;
-
-			int CPIdx = normalizedSegment - 1;
-
-			float step = 0.01f;
-			FVector prev = TraversalStart;
-			for (float Time = 0.0f; Time <= 1.0f; Time += step)
-			{
-				FVector sample = SampleExplicit(State, Time);
-				DrawDebugLine(Actor->GetWorld(), prev, sample, CurveColour, false, DisplayTime, 0.0f, Width);
-				prev = sample;
-			}
-
-			DrawDebugConstraints(Actor, Config, State);
-		}
+		DrawDebugSegment(Actor, Config, State, CurveColour, Width, DisplayTime);
 	}
 #endif
 }

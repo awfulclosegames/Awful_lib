@@ -26,7 +26,7 @@ public:
 	static void Reset(UKBSplineConfig* Config);
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
-	static void GetChord(UKBSplineConfig* Config, int SegmentID, FVector& outChord);
+	static void GetChord(const UKBSplineConfig* Config, int SegmentID, FVector& outChord);
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
 	static void AddSegmentConstraint(UKBSplineConfig* Config, FKBSplineBounds Bound, int SegmentID);
@@ -35,7 +35,7 @@ public:
 	static UKBSplineConfig* CreateSplineConfig(FVector Location);
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
-	static FKBSplineState PrepareForEvaluation(UKBSplineConfig* Config, int PointID = 1);
+	static FKBSplineState PrepareForEvaluation(const UKBSplineConfig* Config, int PointID = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
 	static FVector ComputeTangent(FKBSplineState State);
@@ -51,6 +51,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
 	static void DrawDebug(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour = FColor::Blue, float Width = 0.0f, float DisplayTime = 1.0f);
+
+#if !UE_BUILD_SHIPPING
+	static void DrawDebugSegment(AActor* Actor, const UKBSplineConfig* Config, FKBSplineState State, FColor CurveColour = FColor::Blue, float Width = 0.0f, float DisplayTime = 1.0f);
+#endif
 
 private:
 #if !UE_BUILD_SHIPPING

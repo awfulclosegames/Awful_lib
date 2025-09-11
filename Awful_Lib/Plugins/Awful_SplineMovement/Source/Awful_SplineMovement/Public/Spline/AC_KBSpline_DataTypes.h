@@ -151,7 +151,7 @@ public:
 	void PeekSegment(int SegmentID, FKBSplinePoint Points[4]) const;
 	void ConsumeSegment(int SegmentID);
 
-	void GetTravelChord(int SegmentID, FVector& outChord);
+	void GetTravelChord(int SegmentID, FVector& outChord) const;
 
 	bool IsValidSegment(int SegmentID) const;
 

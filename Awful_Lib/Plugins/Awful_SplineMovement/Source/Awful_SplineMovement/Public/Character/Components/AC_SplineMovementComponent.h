@@ -13,13 +13,44 @@
 
 class ACharacter;
 
+USTRUCT(BlueprintType)
+struct FStepSplineStateInputData
+{
+	GENERATED_BODY()
 
+	FVector InitialPos;
+	FVector CurrentMoveTarget;
+	FVector MomentumDir;
+	FVector SegmentChordDir;
+	float LastRecordedSpeed;
+	float CurrentSegLen;
+	bool bForcePlanerOnly;
+};
+
+USTRUCT(BlueprintType)
+struct FSplineMovementSampleState
+{
+	GENERATED_BODY()
+
+	FKBSplineState State;
+	FVector SegmentChordDir;
+	float SegmentLength;
+};
 
 UCLASS(BlueprintType)
 class AWFUL_SPLINEMOVEMENT_API UAC_SplineMovementComponent : public UCharacterMovementComponent
 {
 	GENERATED_BODY()
+
 public:
+	struct FStepSplineStateOutputData
+	{
+		float ProjectedMomentum;
+		FVector Target;
+		FVector Tangent;
+		FVector Offset;
+	};
+
 	UAC_SplineMovementComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
@@ -95,6 +126,10 @@ public:
 	/// </summary>
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Advandced Spline Movement")
 	float InputCurveContinuationDecay = 0.25;
+
+	// If enabled the motion matching trajectory will be generated from the onward samples, otherwise the animation system will use the UE PoseSearch Generation
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Advandced Spline Movement | Trajectory")
+	bool GenerateAnimTrajectory = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spline Movement")
 	bool bSplineWalk = false;
@@ -201,6 +236,7 @@ public:
 	void SetUseSpline(bool Value);
 	bool GetUseSpline()const { return bSplineWalk; }
 
+	static FRotator GetDesiredOrientToMovementRotation(const FRotator& CurrentRotation, const FVector& Velocity, const FRotator& RotationRate);
 
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const override;
@@ -208,21 +244,43 @@ public:
 	virtual void CalcVelocity(float DeltaTime, float Friction, bool bFluid, float BrakingDeceleration) override;
 
 	virtual void HandleImpact(const FHitResult& Hit, float TimeSlice = 0.f, const FVector& MoveDelta = FVector::ZeroVector) override;
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
 	FVector GetLookaheadPoint() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Spline Movement")
 	bool IsTryingToMove() const;
 
+	static void BuildSplineMovementSampleState(const UKBSplineConfig* SplineConfig, const int PointID, FSplineMovementSampleState& SampleState);
+
 	/// <summary>
 	/// Allows for the game to set ranges for speeds (like walk up to 70% deflection jog to 95%) and make full use of the throttle range
 	/// </summary>
 	UFUNCTION(BlueprintCallable, Category = "Advanced Spline Movement")
 	void SetThrottleNormalization(float NewNormal) { m_ThrottleNomralization = 1.0f / (NewNormal + UE_SMALL_NUMBER); }
-	
+
 	float GetLastRecordedSpeed() const { return m_LastRecordedSpeed; }
 	virtual void SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode = 0) override;
+
+	void BuildStepSplineStateInputData(FStepSplineStateInputData& InputDataToBuild) const;
+
+	typedef TFunction< void(const FVector& SampledPos, const bool StillTryingState) > TSubSampleResultFunc;
+
+	static bool StepSplineStateTargetData(
+		const float DeltaT,
+		const FStepSplineStateInputData& InputData,
+		FKBSplineState& WorkingSplineState,
+		FStepSplineStateOutputData& OutputData,
+		TSubSampleResultFunc SubSampleResultFunc);
+
+	const FKBSplineState& GetSplineState() const { return m_SplineState; }
+	const TObjectPtr<UKBSplineConfig> GetSplineConfig() const { return m_SplineConfig; }
+
+	const FVector& GetSplineFollowingAcceleration() const { return m_SplineFollowingAcceleration; }
+	float GetTimeSinceLastDeflectionChange() const { return m_TimeSinceLastDeflectionChange; }
+	float GetUrgencyFactor() const { return m_UrgencyFactor; }
+
+	static float CalcMovementReponseTime(const float TimeSinceLastDeflectionChange, const float UrgencyFactor, const float Min, const float Max);
 protected:
 	// Adding a new point into the control point stream. virtual so derived classes can provide whatever point generating logic they like
 	virtual FVector GenerateNewSplinePoint(float DeltaT, float TargetTime, const FVector& Input);
@@ -242,7 +300,9 @@ private:
 	void ResetSplineState(float DeltaSeconds = 0.0f);
 
 	void DebugDrawEvaluateForVelocity(float DeltaSeconds);
-
+#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+	void DebugReportSplineCoupling();
+#endif
 
 	TObjectPtr<ACharacter> m_Character;
 
@@ -275,7 +335,7 @@ private:
 	bool m_Interrupted = false;
 	const float m_InterruptionUrgencyReductionFactor = 0.5f;
 	const float m_MaxDeltaVMultiplier = 2.0f; // 2.0 would be going from full speed one way to full speed 180 degrees.
-	
+
 	// Temp for handling lookahead. Should be a query on time that walks the spline
 	FVector m_CurrentLookaheadPoint;
 

@@ -50,7 +50,7 @@ void UKBSplineConfig::ConsumeSegment(int SegmentID)
 	}
 }
 
-void UKBSplineConfig::GetTravelChord(int SegmentID, FVector& outChord)
+void UKBSplineConfig::GetTravelChord(int SegmentID, FVector& outChord) const
 {
 	int normalizedID = NormalizeSegmentID(SegmentID);
 	if (IsValidNormalizedSegment(normalizedID))
