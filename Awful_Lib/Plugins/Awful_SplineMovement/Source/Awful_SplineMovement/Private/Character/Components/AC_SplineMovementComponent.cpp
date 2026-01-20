@@ -731,7 +731,7 @@ FRotator UAC_SplineMovementComponent::ComputeOrientToMovementRotation(const FRot
 
 void UAC_SplineMovementComponent::PerformMovement(float DeltaTime)
 {
-	if (bEnabledSplineUpdates)
+	if (bEnabledSplineUpdates && DeltaTime > 0.0f)
 	{
 		EvaluateNavigationSpline(DeltaTime);
 	}
