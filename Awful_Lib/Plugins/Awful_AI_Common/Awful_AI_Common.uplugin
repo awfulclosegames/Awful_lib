@@ -1,0 +1,25 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"FriendlyName": "Awful_AI_Common",
+	"Description": "A set of common code useful for AI systems",
+	"Category": "Character AI",
+	"CreatedBy": "Strati D. Zerbinis",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"EnabledByDefault": true,
+	"Modules": [
+		{
+			"Name": "Awful_AI_Common",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

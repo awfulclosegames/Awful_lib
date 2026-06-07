@@ -1,0 +1,25 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"FriendlyName": "Awful_BeliefeNetwork",
+	"Description": "A Bayseian Belief Network implementation for partial informaition inference",
+	"Category": "Character AI",
+	"CreatedBy": "Strati D. Zerbinis",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"EnabledByDefault": true,
+	"Modules": [
+		{
+			"Name": "Awful_BeliefNetwork",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
