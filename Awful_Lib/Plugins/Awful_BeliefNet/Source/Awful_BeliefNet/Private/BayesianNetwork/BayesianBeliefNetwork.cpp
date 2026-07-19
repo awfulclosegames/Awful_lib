@@ -1,5 +1,5 @@
 // Copyright Strati D. Zerbinis 2026. All Rights Reserved.
-#include "BayesianBeliefNetwork.h"
+#include "BayesianNetwork/Internal/BayesianBeliefNetwork.h"
 
 namespace Awful_BeliefNet
 {
@@ -184,8 +184,35 @@ namespace Awful_BeliefNet
 	}
 
 
-	// this is the worst function. Complex, expensive, and awkward. This is not expected to be frequent or even 
-	// performed outside of tool chains. Probably a good refactor to move this into an editor/factory class 
+	// Rename a node: update its identifier and the id-map so all existing CPT parent-pointers
+	// (raw BBN_Node*) remain valid thanks to ChunkedPool reference-stability.
+	void BayesianBeliefNetwork::RenameNode(IdentifierType aOldID, IdentifierType aNewID)
+	{
+		auto resolvedHandle = GetHandle(aOldID);
+		if (!resolvedHandle.IsValid())
+		{
+			return;
+		}
+
+		// Reject if a node with the new name already exists
+		auto existingHandle = GetHandle(aNewID);
+		if (existingHandle.IsValid())
+		{
+			return;
+		}
+
+		BBN_Node& node = GetNode(resolvedHandle);
+		node.SetIdentifier(aNewID);
+
+		mIdMap.erase(aOldID);
+		mIdMap.emplace(aNewID, resolvedHandle);
+
+		mRevisionNumber++;
+	}
+
+
+	// this is the worst function. Complex, expensive, and awkward. This is not expected to be frequent or even
+	// performed outside of tool chains. Probably a good refactor to move this into an editor/factory class
 	// TODO:
 	// another simplification would be to use NodeHandle more generally than SequenceKey, since this would still be
 	// stable under swap

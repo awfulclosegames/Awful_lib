@@ -2,8 +2,8 @@
 #pragma once
 
 // filter file to minimize the exposer of implementation details to calling code
-#include "../private/BayesianNetwork/BayesianBeliefNetwork.h"
-#include "../Private/BayesianNetwork/BucketElimination/ByesianInference_BucketElimination.h"
+#include "BayesianNetwork/Internal/BayesianBeliefNetwork.h"
+#include "BayesianNetwork/Internal/BucketElimination/BayesianInference_BucketElimination.h"
 
 namespace Awful_BeliefNet
 {

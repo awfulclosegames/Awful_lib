@@ -1,8 +1,8 @@
 // Copyright Strati D. Zerbinis 2026. All Rights Reserved.
-#include "BayesianNetwork/BucketElimination/InferenceNode.h"
+#include "BayesianNetwork/Internal/BucketElimination/InferenceNode.h"
 
-#include "BayesianNetwork/BBN_Node.h"
-#include "BayesianNetwork/ConditionalProbabilityTable.h"
+#include "BayesianNetwork/Internal/BBN_Node.h"
+#include "BayesianNetwork/Internal/ConditionalProbabilityTable.h"
 
 namespace Awful_BeliefNet
 {

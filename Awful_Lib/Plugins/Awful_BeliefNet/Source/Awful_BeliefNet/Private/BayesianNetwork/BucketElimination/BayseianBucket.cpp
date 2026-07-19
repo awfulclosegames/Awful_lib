@@ -1,8 +1,9 @@
 // Copyright Strati D. Zerbinis 2026. All Rights Reserved.
 #include <set>
+#include <assert.h>
 
-#include "BayesianNetwork/BucketElimination/BayesianBucket.h"
-#include "BayesianNetwork/BBN_Node.h"
+#include "BayesianNetwork/Internal/BucketElimination/BayesianBucket.h"
+#include "BayesianNetwork/Internal/BBN_Node.h"
 
 namespace Awful_BeliefNet
 {
@@ -20,10 +21,20 @@ namespace Awful_BeliefNet
 		{
 		}
 
+		BayesianBucket::BayesianBucket(BayesianBucket& aRHS)
+			: mReference(aRHS.mReference)
+			, mFactor(aRHS.mFactor)
+			, mChildren(aRHS.mChildren)
+			, mParents(aRHS.mParents)
+			, mSignificantParent(this)
+			, mIndexRemapping(aRHS.mIndexRemapping)
+			, mInheritedFactors(aRHS.mInheritedFactors)
+		{}
+
 		// good to have, but it exposes a problem with our management of memory stil
 		// particularly the factor getting a reference to an internal memory buffer
 		// the running results is still in the wrong place!
-		BayesianBucket::BayesianBucket(BayesianBucket&& aRHS)
+		BayesianBucket::BayesianBucket(BayesianBucket&& aRHS) noexcept
 			: mReference(aRHS.mReference)
 			, mFactor(std::move(aRHS.mFactor))
 			, mChildren(std::move(aRHS.mChildren))
@@ -31,8 +42,21 @@ namespace Awful_BeliefNet
 			, mSignificantParent(this)
 			, mIndexRemapping(std::move(aRHS.mIndexRemapping))
 			, mInheritedFactors(std::move(aRHS.mInheritedFactors))
-		{}
+			{}
 
+		// inefficient, avoid using. Implemented only for DLL Linkage
+		BayesianBucket& BayesianBucket::operator=(BayesianBucket& aRHS)
+		{
+			// we don't want to allow this, but for DLL linkage it throws a compile error not to have it
+			assert(false);
+			// use placement new to invoke the copy constructore
+			return *(new(this)BayesianBucket(aRHS));
+		}
+
+		BayesianBucket& BayesianBucket::operator=(BayesianBucket&& aRHS) noexcept
+		{
+			return *(new(this)BayesianBucket(std::move(aRHS)));
+		}
 
 		bool BayesianBucket::HasParent(const BayesianBucket& aTestParent) const
 		{

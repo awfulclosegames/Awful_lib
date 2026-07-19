@@ -1,9 +1,9 @@
 // Copyright Strati D. Zerbinis 2026. All Rights Reserved.
 #include <cmath>
 
-#include "BayesianNetwork/ConditionalProbabilityTable.h"
-#include "BayesianNetwork/BucketElimination/ConditioningFactor.h"
-#include "BayesianNetwork/BBN_Node.h"
+#include "BayesianNetwork/Internal/ConditionalProbabilityTable.h"
+#include "BayesianNetwork/Internal/BucketElimination/ConditioningFactor.h"
+#include "BayesianNetwork/Internal/BBN_Node.h"
 
 namespace Awful_BeliefNet
 {
@@ -41,7 +41,7 @@ namespace Awful_BeliefNet
 	void ConditionalProbabilityTable::Adjust(BBN_Node* aNode, float aCondition)
 	{
 		for (auto& currentCase : mConditioningCases)
-		{
+		{	
 			if (currentCase.node == aNode)
 			{
 				currentCase.probability = aCondition;

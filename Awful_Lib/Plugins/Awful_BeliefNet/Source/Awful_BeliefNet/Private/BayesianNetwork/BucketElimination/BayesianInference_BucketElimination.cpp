@@ -1,7 +1,7 @@
 // Copyright Strati D. Zerbinis 2026. All Rights Reserved.
 #include <algorithm>
 
-#include "BayesianNetwork/BucketElimination/ByesianInference_BucketElimination.h"
+#include "BayesianNetwork/Internal/BucketElimination/BayesianInference_BucketElimination.h"
 
 
 namespace Awful_BeliefNet
@@ -178,7 +178,7 @@ namespace Awful_BeliefNet
 				float confidence = ComputeConfidence(currentOrdering);
 				aResults.emplace_back(currentNode.GetIdentifier(), confidence);
 			}
-			ConfidenceResult::Comparitor comparitor;
+			ConfidenceResult::Comparator comparitor;
 			std::sort(aResults.begin(), aResults.end(), comparitor);
 		}
 
@@ -236,15 +236,8 @@ namespace Awful_BeliefNet
 				{
 					const InferenceNode& node = *currentBucket;
 					// we've directly observed this node and set it's probability accordingly depending on if we observed it as true or false
-					// Later generalize better
-					if (node.GetObservedProbability() > NodeType::sDefaultProbability)
-					{
-						currentBucket->FactorBelief();
-					}
-					else
-					{
-						currentBucket->FactorDisbelief();
-					}
+					// Later generalize better. For now we just quantize belief into true/false
+					currentBucket->FactorByBelief(node.GetObservedProbability() > NodeType::sDefaultProbability);
 				}
 				else
 				{
@@ -308,6 +301,7 @@ namespace Awful_BeliefNet
 				mRevisionNumber = GetRevisionNumber();
 				mOrderings.Clear();
 				mInferenceNodes.clear();
+				mRoots.clear();
 				mInferenceNodes.reserve(GetNodes().size());
 				unsigned int index = 0;
 				for (auto& currentNodeHandle : GetNodes())

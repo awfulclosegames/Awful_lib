@@ -1,5 +1,5 @@
 // Copyright Strati D. Zerbinis 2026. All Rights Reserved.
-#include "BayesianNetwork/BucketElimination/Ordering.h"
+#include "BayesianNetwork/Internal/BucketElimination/Ordering.h"
 
 namespace Awful_BeliefNet
 {

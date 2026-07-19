@@ -1,4 +1,4 @@
 // Copyright Strati D. Zerbinis 2026. All Rights Reserved.
 #pragma once
 
-#include "../Private/BayesianNetwork/Utilities/ProbabilityEditor.h"
+#include "BayesianNetwork/Internal/Utilities/ProbabilityEditor.h"

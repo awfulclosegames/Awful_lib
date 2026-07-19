@@ -1,8 +1,8 @@
 // Copyright Strati D. Zerbinis 2026. All Rights Reserved.
 #include <cmath>
 
-#include "BayesianNetwork/CommonTypes.h"
-#include "BayesianNetwork/BBN_Node.h"
+#include "BayesianNetwork/Internal/CommonTypes.h"
+#include "BayesianNetwork/Internal/BBN_Node.h"
 
 namespace Awful_BeliefNet
 {
